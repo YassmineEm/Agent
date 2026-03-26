@@ -1,0 +1,98 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AKWA RAG Agent — Stack isolée (développement microservice par microservice)
+# Lance : docker-compose up
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Qdrant — Vector Database ───────────────────────────────────────────────
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    container_name: akwa_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis — Cache + Sessions ───────────────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: akwa_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── RAG Agent — Microservice FastAPI ──────────────────────────────────────
+  rag_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akwa_rag_agent
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      # Ollama (serveur physique AKWA)
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+      RAG_LLM_MODEL: "qwen3:8b"
+      EMBED_MODEL:       "bge-m3"
+      EMBED_VECTOR_SIZE: "1024"
+      # Qdrant (container Docker)
+      QDRANT_HOST: "qdrant"
+      QDRANT_PORT: "6333"
+      # Redis (container Docker)
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      # API
+      API_PORT: "8005"
+      ADMIN_API_KEY: "akwa_admin_secret_2025"
+      LOG_LEVEL: "INFO"
+      # Mettre VISION_ENABLED=false pour désactiver sans toucher au code
+      VISION_ENABLED: "true"
+      VISION_MODEL: "qwen2.5vl"
+      VISION_MIN_IMAGE_BYTES: "5000"
+      VISION_TIMEOUT: "120"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+            "import httpx; r=httpx.get('http://localhost:8005/health', timeout=5); r.raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ── Volumes persistants ────────────────────────────────────────────────────────
+volumes:
+  qdrant_data:
+    driver: local
+  redis_data:
+    driver: local
+  huggingface_cache:
+    driver: local
