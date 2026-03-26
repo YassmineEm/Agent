@@ -286,17 +286,17 @@ class RAGAgent:
         cached = await cache_service.get_cached_response(
             question=question,
             chatbot_id=chatbot_id,
-            doc_type_filter=doc_type_filter
+            doc_type=doc_type_filter
         )
         if cached:
             await cache_service.increment_counter(f"rag_cache_hits:{chatbot_id}")
             log.info("Réponse servie depuis cache", trace_id=trace_id)
             return QueryResponse(**cached)
 
-        if not language or language in ("fr", "auto", ""):
-            detected_language = await self._detect_language(question)
+        if not language or language.strip().lower() in ("auto", ""):
+                detected_language = await self._detect_language(question)
         else:
-            detected_language = language
+                detected_language = language.strip().lower()
         log.info("Langue utilisée", language=detected_language, trace_id=trace_id)
 
 
@@ -377,7 +377,7 @@ class RAGAgent:
         await cache_service.set_cached_response(
             question=question,
             chatbot_id=chatbot_id,        
-            doc_type_filter=doc_type_filter,
+            doc_type=doc_type_filter,
             response=response.model_dump()
         )
         if session_id:

@@ -1,6 +1,6 @@
 import json
 import hashlib
-from typing import Optional, Any
+from typing import Optional
 
 import redis.asyncio as aioredis
 
@@ -46,12 +46,15 @@ class CacheService:
     def is_healthy(self) -> bool:
         return self._redis is not None
 
-
+    # ── Cache clé ────────────────────────────────────────────────────────────
 
     def _make_key(self, question: str, chatbot_id: str, doc_type: Optional[str]) -> str:
-        """Génère une clé de cache isolée par chatbot."""
-        raw = f"{chatbot_id}|{question.strip().lower()}|{doc_type or 'all'}"
-        return "rag:response:" + hashlib.sha256(raw.encode()).hexdigest()[:16]
+        """Cache key isolated by chatbot. Normalise None et 'all' filters."""
+        doc_type_norm = doc_type.strip().lower() if doc_type else "all"
+        raw = f"{chatbot_id.strip()}|{question.strip().lower()}|{doc_type_norm}"
+        return "rag:response:" + hashlib.sha256(raw.encode()).hexdigest()[:24]
+
+    # ── Cache réponses ────────────────────────────────────────────────────────
 
     async def get_cached_response(
         self, question: str, chatbot_id: str, doc_type: Optional[str]
@@ -88,7 +91,7 @@ class CacheService:
         except Exception as e:
             log.warning("Erreur écriture cache", error=str(e))
 
-
+    # ── Sessions ──────────────────────────────────────────────────────────────
 
     async def get_session(self, chatbot_id: str, session_id: str) -> list:
         """Récupère l'historique de conversation pour un chatbot spécifique."""
@@ -109,7 +112,6 @@ class CacheService:
         try:
             history = await self.get_session(chatbot_id, session_id)
             history.append({"q": question, "a": answer})
-            # Garder les 10 derniers échanges max
             history = history[-10:]
             await self._redis.setex(
                 f"session:{chatbot_id}:{session_id}",
@@ -119,7 +121,7 @@ class CacheService:
         except Exception as e:
             log.warning("Erreur update session", error=str(e))
 
-
+    # ── Monitoring ────────────────────────────────────────────────────────────
 
     async def increment_counter(self, key: str):
         """Compteur de requêtes pour monitoring."""
@@ -129,7 +131,7 @@ class CacheService:
             except Exception:
                 pass
 
-
+    # ── Rate limiting ─────────────────────────────────────────────────────────
 
     async def check_rate_limit(
         self,
@@ -139,7 +141,6 @@ class CacheService:
     ) -> tuple[bool, int]:
         """
         Vérifie si le client a dépassé la limite de requêtes.
-
         Retourne (is_allowed, remaining_requests).
         """
         if not self._redis:
