@@ -1,0 +1,526 @@
+/* ============================================================================
+   STYLES PERSONNALISÉS AFRIQUIA POUR L'ADMIN DJANGO
+   ============================================================================ */
+
+/* Polices */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Inter:wght=300;400;500;600;700&display=swap');
+
+:root {
+    --afriquia-green: #1e3a2e;
+    --afriquia-teal: #004d4f;
+    --afriquia-sand: #fae9c2;
+    --afriquia-ocre: #ad6b3b;
+    --afriquia-brown: #584b3b;
+    --afriquia-light: #f2efe6;
+    --afriquia-white: #ffffff;
+    --afriquia-gray: #6c757d;
+    --afriquia-success: #28a745;
+    --afriquia-danger: #dc3545;
+    --afriquia-warning: #ffc107;
+    --afriquia-info: #17a2b8;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--afriquia-light);
+    color: var(--afriquia-brown);
+}
+
+/* ===== HEADER PERSONNALISÉ ===== */
+#header {
+    background: linear-gradient(135deg, var(--afriquia-green), var(--afriquia-teal));
+    color: var(--afriquia-white);
+    border-bottom: 3px solid var(--afriquia-ocre);
+    padding: 0.8rem 2rem;
+}
+
+#branding h1 {
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 800;
+    font-size: 1.8rem;
+    letter-spacing: -0.5px;
+}
+
+#branding h1 a {
+    color: var(--afriquia-sand) !important;
+    text-decoration: none;
+    position: relative;
+}
+
+#branding h1 a::before {
+    content: "أ";
+    font-family: 'Tajawal', sans-serif;
+    font-size: 2rem;
+    color: var(--afriquia-sand);
+    margin-right: 10px;
+    opacity: 0.8;
+}
+
+#user-tools {
+    font-size: 0.9rem;
+}
+
+/* ===== SIDEBAR PERSONNALISÉE ===== */
+.sidebar {
+    background: var(--afriquia-white);
+    border-right: 1px solid rgba(0,0,0,0.05);
+}
+
+.sidebar .nav-sidebar > .nav-item > .nav-link {
+    color: var(--afriquia-brown);
+    font-weight: 500;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0;
+    transition: all 0.2s;
+}
+
+.sidebar .nav-sidebar > .nav-item > .nav-link:hover {
+    background: rgba(0, 77, 79, 0.05);
+    color: var(--afriquia-teal);
+    padding-left: 2rem;
+}
+
+.sidebar .nav-sidebar > .nav-item > .nav-link.active {
+    background: linear-gradient(90deg, var(--afriquia-teal), transparent);
+    color: var(--afriquia-white);
+    font-weight: 600;
+    border-left: 4px solid var(--afriquia-ocre);
+}
+
+/* Icônes dans la sidebar */
+.sidebar .nav-sidebar .nav-link i {
+    color: var(--afriquia-ocre);
+    width: 1.5rem;
+    text-align: center;
+}
+
+.sidebar .nav-sidebar .nav-link.active i {
+    color: var(--afriquia-white);
+}
+
+/* ===== MODULES ===== */
+.module {
+    background: var(--afriquia-white);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.03);
+    margin-bottom: 1.5rem;
+}
+
+.module h2, .module caption {
+    background: linear-gradient(135deg, var(--afriquia-green), var(--afriquia-teal));
+    color: var(--afriquia-white);
+    font-family: 'Tajawal', sans-serif;
+    font-weight: 700;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid var(--afriquia-ocre);
+}
+
+.module h2 a, .module caption a {
+    color: var(--afriquia-sand) !important;
+}
+
+/* ===== TABLES ===== */
+#changelist table {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+#changelist thead th {
+    background: #f8f5f0;
+    color: var(--afriquia-brown);
+    font-weight: 600;
+    border-bottom: 2px solid var(--afriquia-ocre);
+    padding: 1rem;
+}
+
+#changelist tbody tr:hover {
+    background: rgba(0, 77, 79, 0.02);
+}
+
+#changelist tbody td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+/* ===== BOUTONS ===== */
+.button, input[type=submit], input[type=button], .submit-row input {
+    background: var(--afriquia-teal);
+    color: var(--afriquia-white);
+    border: none;
+    border-radius: 30px;
+    padding: 0.6rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.button:hover, input[type=submit]:hover, input[type=button]:hover {
+    background: var(--afriquia-green);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,77,79,0.2);
+}
+
+.button.default, input[type=submit].default {
+    background: var(--afriquia-ocre);
+    font-weight: 600;
+}
+
+.button.default:hover {
+    background: #8b5a3a;
+}
+
+/* Bouton de suppression */
+.deletelink {
+    background: var(--afriquia-danger);
+    color: white;
+    border-radius: 30px;
+    padding: 0.6rem 1.5rem;
+}
+
+/* ===== FORMULAIRES ===== */
+.aligned label {
+    color: var(--afriquia-brown);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+input, textarea {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    transition: all 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--afriquia-teal);
+    box-shadow: 0 0 0 3px rgba(0,77,79,0.1);
+    outline: none;
+}
+
+/* ===== FIX SELECT / DROPDOWN ===== */
+select,
+.form-row select,
+.aligned select,
+.inline-group select,
+.inline-related select,
+.dynamic-form select,
+#content-main select {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    transition: all 0.2s;
+    min-width: 220px !important;
+    width: auto !important;
+    max-width: 100% !important;
+    height: auto !important;
+    box-sizing: border-box;
+    background-color: #fff;
+    color: var(--afriquia-brown);
+    font-size: 0.9rem;
+    appearance: auto;
+    -webkit-appearance: auto;
+}
+
+/* Fix spécifique pour le champ Role (UserProfile inline) */
+.field-role select,
+.form-row.field-role select {
+    min-width: 250px !important;
+    width: auto !important;
+}
+
+/* Fix pour le champ Moteur de base de données (DB engine) */
+.field-engine select,
+.form-row.field-engine select {
+    min-width: 220px !important;
+    width: auto !important;
+}
+
+/* Fix pour le widget ManyToMany (Allowed chatbots) */
+select[multiple],
+.form-row select[multiple],
+.inline-related select[multiple] {
+    min-width: 300px !important;
+    min-height: 120px !important;
+    width: auto !important;
+}
+
+/* ===== FILTERS ===== */
+#changelist-filter {
+    background: var(--afriquia-white);
+    border-radius: 8px;
+    padding: 1.2rem;
+    border: 1px solid rgba(0,0,0,0.03);
+}
+
+#changelist-filter h2 {
+    background: var(--afriquia-green);
+    color: var(--afriquia-white);
+    border-radius: 6px;
+    font-size: 1rem;
+    padding: 0.6rem 1rem;
+}
+
+#changelist-filter h3 {
+    color: var(--afriquia-brown);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+#changelist-filter ul li a {
+    color: var(--afriquia-gray);
+    transition: all 0.2s;
+}
+
+#changelist-filter ul li a:hover {
+    color: var(--afriquia-teal);
+    padding-left: 0.5rem;
+}
+
+/* ===== PAGINATION ===== */
+.paginator {
+    background: var(--afriquia-white);
+    border-radius: 30px;
+    padding: 0.8rem 1.5rem;
+    margin-top: 1rem;
+    border: 1px solid rgba(0,0,0,0.03);
+}
+
+.paginator a {
+    background: var(--afriquia-teal);
+    color: var(--afriquia-white);
+    border-radius: 30px;
+    padding: 0.4rem 1rem;
+    margin: 0 0.2rem;
+}
+
+.paginator a:hover {
+    background: var(--afriquia-green);
+}
+
+/* ===== BREADCRUMBS ===== */
+.breadcrumbs {
+    background: var(--afriquia-white);
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+    padding: 1rem 2rem;
+    font-size: 0.9rem;
+}
+
+.breadcrumbs a {
+    color: var(--afriquia-teal);
+}
+
+/* ===== FOOTER ===== */
+#footer {
+    background: var(--afriquia-white);
+    border-top: 1px solid rgba(0,0,0,0.03);
+    color: var(--afriquia-gray);
+    padding: 1.5rem;
+    text-align: center;
+}
+
+/* ===== CUSTOM BLOCKS POUR LES INLINES ===== */
+.inline-group {
+    background: var(--afriquia-white);
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.03);
+    margin-bottom: 1.5rem;
+}
+
+.inline-group h2 {
+    background: linear-gradient(135deg, var(--afriquia-green), var(--afriquia-teal));
+    color: var(--afriquia-white);
+    border-radius: 8px 8px 0 0;
+    padding: 0.8rem 1.2rem;
+}
+
+/* Alignement vertical centré — toutes les cellules inline */
+.inline-group table td,
+.inline-related table td,
+.tabular.inline-related tbody td {
+    vertical-align: middle !important;
+    padding: 12px 10px !important;
+}
+
+.inline-group table th,
+.inline-related table th {
+    vertical-align: middle !important;
+    white-space: nowrap;
+}
+
+/* ===== DASHBOARD PERSONNALISÉ ===== */
+.dashboard #content {
+    width: 100%;
+}
+
+.dashboard .module table th {
+    color: var(--afriquia-brown);
+    font-weight: 600;
+}
+
+/* ===== MESSAGES D'ALERTE ===== */
+.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* ===== CARTES STATISTIQUES (SI UTILISÉES) ===== */
+.stats-card {
+    background: var(--afriquia-white);
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    border-left: 4px solid var(--afriquia-ocre);
+}
+
+.stats-card .stats-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--afriquia-teal);
+}
+
+.stats-card .stats-label {
+    color: var(--afriquia-gray);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ===== ANIMATIONS DOUCES ===== */
+* {
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 767px) {
+    #header {
+        padding: 0.5rem 1rem;
+    }
+    
+    #branding h1 {
+        font-size: 1.4rem;
+    }
+    
+    .sidebar {
+        position: static;
+        width: 100%;
+    }
+
+    select,
+    .form-row select,
+    .aligned select {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+/* ============================================================================
+   CORRECTION BARRE DE RECHERCHE - Alignement icône et bouton
+   ============================================================================ */
+
+/* Conteneur principal de la recherche */
+#toolbar form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Label de recherche (contenant l'icône) */
+#toolbar form label {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+/* Image de l'icône de recherche */
+#toolbar form label img {
+    vertical-align: middle;
+    margin: 0;
+    display: inline-block;
+}
+
+/* Champ de recherche */
+#toolbar #searchbar {
+    height: 38px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    vertical-align: middle;
+}
+
+/* Bouton Rechercher */
+#toolbar form input[type="submit"] {
+    height: 38px;
+    margin: 0;
+    padding: 8px 16px;
+    background: var(--afriquia-teal);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    line-height: normal;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Effet hover du bouton */
+#toolbar form input[type="submit"]:hover {
+    background: var(--afriquia-green);
+    transform: translateY(-1px);
+}
+
+/* Pour mobile/responsive */
+@media (max-width: 767px) {
+    #toolbar form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #toolbar form label {
+        margin-bottom: 5px;
+    }
+    
+    #toolbar #searchbar,
+    #toolbar form input[type="submit"] {
+        width: 100%;
+    }
+}
+
