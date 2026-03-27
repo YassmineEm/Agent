@@ -1,0 +1,58 @@
+# ─── API Framework ────────────────────────────────────────────────────────────
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# ─── LangChain + Ollama ───────────────────────────────────────────────────────
+langchain==0.3.13
+langchain-community==0.3.13
+langchain-ollama==0.2.2
+langchain-qdrant==0.2.0
+
+# ─── Qdrant ───────────────────────────────────────────────────────────────────
+qdrant-client==1.12.1
+fastembed==0.7.4
+
+# ─── Reranking — PyTorch CPU UNIQUEMENT (évite CUDA ~3GB) ────────────────────
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+sentence-transformers==3.3.1
+
+# ─── Document Loaders ─────────────────────────────────────────────────────────
+pypdf==5.1.0
+python-docx==1.1.2
+docx2txt==0.8
+
+# ─── Vision — extraction images PDF/DOCX + analyse Qwen2.5-VL ────────────────
+# PyMuPDF : extraire les images embarquées dans les PDF page par page
+pymupdf==1.24.0
+# Pillow : manipulation d'images avant envoi à Qwen2.5-VL
+Pillow==11.0.0
+
+# ─── Redis ───────────────────────────────────────────────────────────────────
+redis[asyncio]==5.2.1
+
+# ─── Resilience ────────────────────────────────────────────────────────────────
+tenacity==9.0.0
+
+# ─── HTTP Client ────────────────────────────────────────────────────────────────
+httpx==0.28.1
+
+# ─── Logging ────────────────────────────────────────────────────────────────────
+structlog==24.4.0
+
+# ─── Utils ────────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.24.0
+
+# ─── Excel (sans unstructured lourd) ─────────────────────────────────────────
+openpyxl==3.1.5
+xlrd==2.0.1
+# unstructured[xlsx] supprimé → remplacé par openpyxl direct
