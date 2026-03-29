@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+
+  sql_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akwa_sql_agent
+    restart: unless-stopped
+    ports:
+      - "8006:8006"           
+    environment:
+      API_PORT:        "8006"
+      # Variables de connexion à ta base PostgreSQL/MySQL
+      DB_HOST:         ${DB_HOST:-host.docker.internal}
+      DB_PORT:         ${DB_PORT:-5432}
+      DB_NAME:         ${DB_NAME:-akwa_db}
+      DB_USER:         ${DB_USER:-akwa_user}
+      DB_PASSWORD:     ${DB_PASSWORD:-akwa_password}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+      LOG_LEVEL:       "INFO"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # accès à la BDD sur la machine hôte
+    networks:
+      - akwa_net              # ← réseau partagé, visible par l'orchestrateur
+    healthcheck:
+      test: ["CMD", "python", "-c",
+            "import httpx; r=httpx.get('http://localhost:8006/health', timeout=5); r.raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  akwa_net:
+    external: true            # réseau partagé
