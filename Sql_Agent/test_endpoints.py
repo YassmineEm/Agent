@@ -1,7 +1,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 def run_system_test():
     print("🚀 Starting Multi-Agent Text2SQL System Test...\n")
@@ -34,6 +34,9 @@ def run_system_test():
     print("Step 2: Verifying Database Cache...")
     db_list_resp = requests.get(f"{BASE_URL}/databases")
     print(f"Active Databases in Cache: {db_list_resp.json()}\n")
+    print("Step 3: Verifying Chatbot Cache...")
+    chatbot_list_resp = requests.get(f"{BASE_URL}/chatbots")
+    print(f"Active Chatbots in Cache: {chatbot_list_resp.json()}\n)")
 
     # 4. QUERY: Ask the User Question
     print("Step 3: Sending User Query...")

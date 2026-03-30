@@ -1,0 +1,45 @@
+/* Custom styles for the Meta-Chatbot Dashboard using Tailwind CSS */
+
+body {
+    @apply bg-gray-100 text-gray-800;
+}
+
+.header {
+    @apply bg-white shadow-md p-4;
+}
+
+.footer {
+    @apply bg-gray-800 text-white p-4;
+}
+
+.card {
+    @apply bg-white rounded-lg shadow-md p-6 mb-4;
+}
+
+.button {
+    @apply bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600;
+}
+
+.input {
+    @apply border border-gray-300 rounded-lg p-2 w-full;
+}
+
+.table {
+    @apply min-w-full bg-white border border-gray-300;
+}
+
+.table th, .table td {
+    @apply border-b border-gray-300 p-4;
+}
+
+.table th {
+    @apply bg-gray-200 text-left;
+}
+
+.alert {
+    @apply bg-red-500 text-white p-4 rounded-lg mb-4;
+}
+
+.hidden {
+    @apply hidden;
+}

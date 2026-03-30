@@ -1,0 +1,81 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Dashboard - Meta-Chatbot Factory{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Chatbot Dashboard</h1>
+    <p class="mt-2 text-sm text-gray-600">Manage and configure your AI agents</p>
+</div>
+
+{% if chatbots %}
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {% for chatbot in chatbots %}
+    <div class="bg-white overflow-hidden shadow-lg rounded-lg hover:shadow-xl transition-shadow duration-300">
+        <div class="p-6">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 truncate">{{ chatbot.name }}</h3>
+                <span class="{% if chatbot.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %} text-xs font-medium px-2.5 py-0.5 rounded-full">
+                    {% if chatbot.is_active %}Active{% else %}Inactive{% endif %}
+                </span>
+            </div>
+            
+            <p class="mt-2 text-sm text-gray-600 line-clamp-2">{{ chatbot.description|default:"No description" }}</p>
+            
+            <div class="mt-4 flex items-center text-sm text-gray-500">
+                <i class="fas fa-brain mr-2"></i>
+                <span class="font-medium">{{ chatbot.get_base_model_display }}</span>
+            </div>
+            
+            <!-- Module badges -->
+            <div class="mt-4 flex flex-wrap gap-2">
+                {% if chatbot.sql_enabled %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                    <i class="fas fa-database mr-1"></i> SQL
+                </span>
+                {% endif %}
+                {% if chatbot.rag_enabled %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800">
+                    <i class="fas fa-book mr-1"></i> RAG
+                </span>
+                {% endif %}
+                {% if chatbot.action_enabled %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-800">
+                    <i class="fas fa-cog mr-1"></i> Actions
+                </span>
+                {% endif %}
+            </div>
+            
+            <!-- Actions -->
+            <div class="mt-6 flex justify-between items-center">
+                <a href="{% url 'dashboard:chatbot_detail' chatbot.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    View Details →
+                </a>
+                <div class="flex space-x-2">
+                    <a href="{% url 'dashboard:chatbot_edit' chatbot.pk %}" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <a href="{% url 'dashboard:chatbot_delete' chatbot.pk %}" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-6 py-3 text-xs text-gray-500">
+            Created {{ chatbot.created_at|date:"M d, Y" }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-12">
+    <i class="fas fa-robot text-6xl text-gray-300 mb-4"></i>
+    <h3 class="text-lg font-medium text-gray-900 mb-2">No chatbots yet</h3>
+    <p class="text-gray-600 mb-6">Get started by creating your first AI agent</p>
+    <a href="{% url 'dashboard:chatbot_create' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+        <i class="fas fa-plus mr-2"></i>
+        Create Chatbot
+    </a>
+</div>
+{% endif %}
+{% endblock %}

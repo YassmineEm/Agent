@@ -65,6 +65,13 @@ async def get_all_databases():
         {"db_id": k, "db_name": v["db_name"]} 
         for k, v in db_cache.items()
     ]
+@app.get("/chatbots")
+async def get_all_chatbots():
+    """Returns a list of all chatbots currently in the microservice cache."""
+    return [
+        {"chatbot_id": k, "model_name": v["model_name"], "db_ids": v["db_ids"]} 
+        for k, v in chatbot_cache.items()
+    ]
 
 # --- ENDPOINT: SYNC CHATBOT (With Implicit DB Sync) ---
 @app.post("/sync/chatbot")

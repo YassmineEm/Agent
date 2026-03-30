@@ -1,0 +1,199 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}{{ chatbot.name }} - Details{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ chatbot.name }}</h1>
+            <p class="mt-1 text-sm text-gray-600">{{ chatbot.description }}</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{% url 'dashboard:chatbot_edit' chatbot.pk %}" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <i class="fas fa-edit mr-2"></i>
+                Edit
+            </a>
+            <a href="{% url 'dashboard:chatbot_delete' chatbot.pk %}" class="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50">
+                <i class="fas fa-trash mr-2"></i>
+                Delete
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Identity Section -->
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 bg-gray-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+            <i class="fas fa-id-card mr-2"></i>Identity & Configuration
+        </h3>
+    </div>
+    <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Base Model</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ chatbot.get_base_model_display }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                <dd class="mt-1">
+                    <span class="{% if chatbot.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %} px-2 py-1 text-xs font-medium rounded-full">
+                        {% if chatbot.is_active %}Active{% else %}Inactive{% endif %}
+                    </span>
+                </dd>
+            </div>
+            <div class="sm:col-span-2">
+                <dt class="text-sm font-medium text-gray-500">System Role</dt>
+                <dd class="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded font-mono">{{ chatbot.role }}</dd>
+            </div>
+            {% if chatbot.scope %}
+            <div class="sm:col-span-2">
+                <dt class="text-sm font-medium text-gray-500">Guardrails</dt>
+                <dd class="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded font-mono">{{ chatbot.scope }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+<!-- SQL Agent Section -->
+{% if chatbot.sql_enabled %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 bg-blue-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+            <i class="fas fa-database mr-2 text-blue-600"></i>SQL Agent
+        </h3>
+    </div>
+    <div class="border-t border-gray-200">
+        {% if sql_connections %}
+        <ul class="divide-y divide-gray-200">
+            {% for conn in sql_connections %}
+            <li class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">{{ conn.name }}</p>
+                        <p class="text-sm text-gray-500">{{ conn.get_db_type_display }}</p>
+                    </div>
+                    <span class="{% if conn.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %} px-2 py-1 text-xs font-medium rounded-full">
+                        {% if conn.is_active %}Active{% else %}Inactive{% endif %}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="px-4 py-5 sm:px-6 text-center text-gray-500">
+            No SQL connections configured
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- RAG Agent Section -->
+{% if chatbot.rag_enabled and rag_config %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 bg-purple-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+            <i class="fas fa-book mr-2 text-purple-600"></i>RAG Agent
+        </h3>
+    </div>
+    <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-3">
+            <div class="mt-6 border border-purple-200 rounded-lg p-4 bg-purple-50">
+    <h4 class="text-sm font-semibold text-gray-800 mb-3">Upload Document</h4>
+    <form method="post" enctype="multipart/form-data" action="{% url 'dashboard:rag_upload_document' chatbot.pk %}" class="space-y-3">
+        {% csrf_token %}
+        <div>
+            <input type="file" name="file" required class="w-full text-sm">
+        </div>
+        <div>
+            <select name="doc_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                {% for value, label in doc_type_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <input type="text" name="description" placeholder="Optional description" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700">
+            Upload to RAG
+        </button>
+    </form>
+</div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Top-K</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ rag_config.top_k }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Reranker</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if rag_config.use_reranker %}<i class="fas fa-check text-green-600"></i>{% else %}<i class="fas fa-times text-red-600"></i>{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Query Expansion</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if rag_config.use_query_expansion %}<i class="fas fa-check text-green-600"></i>{% else %}<i class="fas fa-times text-red-600"></i>{% endif %}
+                </dd>
+            </div>
+        </dl>
+        
+        {% if documents %}
+        <div class="mt-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Documents</h4>
+            <ul class="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                {% for doc in documents %}
+                <li class="px-4 py-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-900">{{ doc.name }}</span>
+                        <span class="{% if doc.is_indexed %}bg-green-100 text-green-800{% else %}bg-yellow-100 text-yellow-800{% endif %} px-2 py-1 text-xs rounded-full">
+                            {% if doc.is_indexed %}Indexed{% else %}Pending{% endif %}
+                        </span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Action Agent Section -->
+{% if chatbot.action_enabled %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+    <div class="px-4 py-5 sm:px-6 bg-orange-50">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+            <i class="fas fa-cog mr-2 text-orange-600"></i>Action Agent
+        </h3>
+    </div>
+    <div class="border-t border-gray-200">
+        {% if actions %}
+        <ul class="divide-y divide-gray-200">
+            {% for action in actions %}
+            <li class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">{{ action.name }}</p>
+                        <p class="text-sm text-gray-500">{{ action.description }}</p>
+                        <p class="text-xs text-gray-400 mt-1 font-mono">{{ action.method }} {{ action.endpoint }}</p>
+                    </div>
+                    <span class="{% if action.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %} px-2 py-1 text-xs font-medium rounded-full">
+                        {% if action.is_active %}Active{% else %}Inactive{% endif %}
+                    </span>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="px-4 py-5 sm:px-6 text-center text-gray-500">
+            No actions configured
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
