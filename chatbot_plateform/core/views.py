@@ -1,5 +1,3 @@
-# core/views.py — FICHIER COMPLET CORRIGÉ
-
 import os
 import logging
 

@@ -1,5 +1,3 @@
-# core/signals.py — FICHIER COMPLET REMPLACÉ
-
 import logging
 import os
 
