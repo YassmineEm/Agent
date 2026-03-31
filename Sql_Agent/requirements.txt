@@ -1,24 +1,11 @@
-# Web Server
 fastapi
-uvicorn[standard]
-pydantic
-
-# LangChain Core & Orchestration
-langchain
-langchain-core
-langchain-community
-langchain_openai
-
-# LLM Connectors (Ollama / Local Inference)
-langchain-ollama
-
-# Database & Schema Extraction
+uvicorn
+httpx
+redis
 sqlalchemy
-# sqlite is built-in to Python
-# For other DBs, you'll need these drivers (uncomment if needed):
-# psycopg2-binary  # For PostgreSQL
-# pymysql          # For MySQL/MariaDB
-
-# Utilities
-requests
+langchain
+langchain-groq
+langchain-core
+langchain-openai
+pydantic
 python-dotenv
