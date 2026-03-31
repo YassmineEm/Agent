@@ -10,7 +10,7 @@ class ChatbotForm(forms.ModelForm):
         model = Chatbot
         fields = [
             'name', 'description', 'role', 'scope', 'base_model',
-            'sql_enabled', 'rag_enabled', 'action_enabled', 'is_active'
+            'sql_enabled', 'sql_llm', 'rag_enabled', 'action_enabled', 'is_active'
         ]
         widgets = {
             'name': forms.TextInput(attrs={
@@ -33,6 +33,9 @@ class ChatbotForm(forms.ModelForm):
                 'placeholder': 'Define boundaries and guardrails...'
             }),
             'base_model': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+            }),
+            'sql_llm': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
             }),
             'sql_enabled': forms.CheckboxInput(attrs={
@@ -58,7 +61,7 @@ class SQLAgentForm(forms.ModelForm):
 
     class Meta:
         model = SQLAgent
-        fields = ['name', 'db_name', 'db_type', 'llm', 'connection_string', 'is_active']
+        fields = ['name', 'db_name', 'db_type', 'connection_string', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
@@ -75,9 +78,6 @@ class SQLAgentForm(forms.ModelForm):
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm',
                 'placeholder': 'sqlite:///database/flight.sqlite or postgresql://user:pass@host:5432/dbname',
                 'type': 'password'
-            }),
-            'llm': forms.Select(attrs={
-                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'w-4 h-4 text-blue-600 rounded focus:ring-blue-500'

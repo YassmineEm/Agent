@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
 from .models import Chatbot, RAGAgent, DocumentReference
@@ -8,7 +8,8 @@ from .forms import (
     ChatbotForm, SQLAgentForm, RAGAgentForm,
     ActionAgentForm, SQLAgentFormSet, ActionAgentFormSet
 )
-from api.gateway import sync_sql_chatbot, upload_rag_document, ServiceGatewayError
+from api.gateway import sync_sql_chatbot, upload_rag_document, query_sql_agent, query_rag_agent, ServiceGatewayError
+import json
 
 
 def index(request):
@@ -24,13 +25,13 @@ def chatbot_create(request):
     """Create new chatbot with dynamic configuration"""
     if request.method == 'POST':
         form = ChatbotForm(request.POST)
-        
+
         if form.is_valid():
             chatbot = form.save()
-            
+
             # Create RAG config if enabled
             if chatbot.rag_enabled:
-                RAGAgent.objects.create(
+                rag_config = RAGAgent.objects.create(
                     chatbot=chatbot,
                     use_reranker=request.POST.get('use_reranker') == 'on',
                     use_query_expansion=request.POST.get('use_query_expansion') == 'on',
@@ -38,20 +39,56 @@ def chatbot_create(request):
                     embedding_model=request.POST.get('embedding_model', 'sentence-transformers/all-MiniLM-L6-v2'),
                 )
 
+                # Handle file upload during creation
+                uploaded_file = request.FILES.get("file")
+                if uploaded_file:
+                    local_doc_type = request.POST.get("doc_type", "other")
+
+                    rag_doc_type_map = {
+                        "fiche_technique": "fiche_technique",
+                        "faq": "faq",
+                        "manual": "general",
+                        "report": "general",
+                        "guide": "general",
+                        "other": "general",
+                    }
+                    rag_doc_type = rag_doc_type_map.get(local_doc_type, "general")
+
+                    try:
+                        result = upload_rag_document(
+                            chatbot_id=chatbot.name,
+                            uploaded_file=uploaded_file,
+                            doc_type=rag_doc_type,
+                            description="",
+                        )
+
+                        DocumentReference.objects.create(
+                            rag_agent=rag_config,
+                            name=uploaded_file.name,
+                            doc_type=local_doc_type,
+                            file_path=uploaded_file.name,
+                            content_type=uploaded_file.content_type or "",
+                            is_indexed=True,
+                            chunks_indexed=result.get("chunks_indexed", 0),
+                        )
+                        messages.success(request, f"Document uploaded and indexed: {uploaded_file.name}")
+                    except ServiceGatewayError as exc:
+                        messages.warning(request, f"Chatbot created, but RAG upload failed: {exc}")
+
             if chatbot.sql_enabled:
                 try:
                     sync_sql_chatbot(chatbot)
                     messages.success(request, "SQL Agent synced successfully.")
                 except ServiceGatewayError as exc:
                     messages.warning(request, f"Chatbot created, but SQL sync failed: {exc}")
-            
+
             messages.success(request, f'Chatbot "{chatbot.name}" created successfully!')
             return redirect('dashboard:chatbot_detail', pk=chatbot.pk)
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
         form = ChatbotForm()
-    
+
     context = {
         'form': form,
         'is_create': True
@@ -217,11 +254,87 @@ def add_action_row(request):
 def chatbot_delete(request, pk):
     """Delete chatbot"""
     chatbot = get_object_or_404(Chatbot, pk=pk)
-    
+
     if request.method == 'POST':
         name = chatbot.name
         chatbot.delete()
         messages.success(request, f'Chatbot "{name}" deleted successfully!')
         return redirect('dashboard:index')
-    
+
     return render(request, 'dashboard/chatbot_confirm_delete.html', {'chatbot': chatbot})
+
+
+@require_http_methods(["GET"])
+def test_sql_agent(request, pk):
+    """Test SQL agent with a query"""
+    chatbot = get_object_or_404(Chatbot, pk=pk)
+
+    if not chatbot.sql_enabled:
+        return JsonResponse({
+            'success': False,
+            'error': 'SQL Agent is not enabled for this chatbot'
+        })
+
+    question = request.GET.get('question', '')
+    if not question:
+        return JsonResponse({
+            'success': False,
+            'error': 'Question parameter is required'
+        })
+
+    try:
+        result = query_sql_agent(
+            chatbot_id=chatbot.name,
+            user_question=question
+        )
+        return JsonResponse({
+            'success': True,
+            'result': result
+        })
+    except ServiceGatewayError as exc:
+        return JsonResponse({
+            'success': False,
+            'error': str(exc)
+        })
+
+
+@require_http_methods(["POST"])
+def test_rag_agent(request, pk):
+    """Test RAG agent with a query"""
+    chatbot = get_object_or_404(Chatbot, pk=pk)
+
+    if not chatbot.rag_enabled:
+        return JsonResponse({
+            'success': False,
+            'error': 'RAG Agent is not enabled for this chatbot'
+        })
+
+    try:
+        data = json.loads(request.body)
+        question = data.get('question', '')
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        })
+
+    if not question:
+        return JsonResponse({
+            'success': False,
+            'error': 'Question parameter is required'
+        })
+
+    try:
+        result = query_rag_agent(
+            chatbot_id=chatbot.name,
+            question=question
+        )
+        return JsonResponse({
+            'success': True,
+            'result': result
+        })
+    except ServiceGatewayError as exc:
+        return JsonResponse({
+            'success': False,
+            'error': str(exc)
+        })

@@ -146,7 +146,7 @@
         </div>
 
         <!-- SQL Agent Configuration -->
-        <div x-show="sqlEnabled" 
+        <div x-show="sqlEnabled"
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 transform -translate-y-4"
              x-transition:enter-end="opacity-100 transform translate-y-0"
@@ -158,12 +158,26 @@
                 </h2>
             </div>
             <div class="p-6">
+                <!-- Global SQL LLM Configuration -->
+                <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label for="{{ form.sql_llm.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        SQL Agent LLM <span class="text-red-500">*</span>
+                    </label>
+                    <p class="text-xs text-gray-600 mb-3">This LLM will be used for all SQL database connections</p>
+                    {{ form.sql_llm }}
+                    {% if form.sql_llm.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.sql_llm.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Database Connections -->
+                <h3 class="text-md font-semibold text-gray-900 mb-4">Database Connections</h3>
                 <div id="sql-connections-container" class="space-y-4">
                     {% if sql_formset %}
                         {{ sql_formset.management_form }}
                         {% for form in sql_formset %}
                         <div class="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Connection Name</label>
                                     {{ form.name }}
@@ -176,11 +190,7 @@
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Database Type</label>
                                     {{ form.db_type }}
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">LLM</label>
-                                    {{ form.llm }}
-                                </div>
-                                <div class="md:col-span-4">
+                                <div class="md:col-span-3">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Connection String</label>
                                     {{ form.connection_string }}
                                 </div>
@@ -250,28 +260,9 @@
                             <option value="other" selected>Other</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
-                        <input type="text" name="description" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="Short description for indexing context">
-                    </div>
-                    <div class="flex justify-end">
-                        {% if is_create %}
-                        <button type="button" disabled class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-400 bg-gray-100 cursor-not-allowed">
-                            <i class="fas fa-upload mr-2"></i>
-                            Save Chatbot First
-                        </button>
-                        {% else %}
-                        <button
-                            type="submit"
-                            formaction="{% url 'dashboard:rag_upload_document' chatbot.pk %}"
-                            formmethod="post"
-                            formenctype="multipart/form-data"
-                            class="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-white hover:bg-purple-50"
-                        >
-                            <i class="fas fa-upload mr-2"></i>
-                            Upload File
-                        </button>
-                        {% endif %}
+                    <div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3">
+                        <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+                        Document will be uploaded and indexed when you create the chatbot
                     </div>
                 </div>
 

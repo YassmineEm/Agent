@@ -33,7 +33,16 @@ class Chatbot(models.Model):
     sql_enabled = models.BooleanField(default=False)
     rag_enabled = models.BooleanField(default=False)
     action_enabled = models.BooleanField(default=False)
-    
+
+    # SQL Agent LLM configuration (global for all connections)
+    sql_llm = models.CharField(
+        max_length=100,
+        choices=MODEL_CHOICES,
+        default='Qwen/Qwen2.5-7B-Instruct',
+        help_text="LLM used by SQL agent for all database connections",
+        blank=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -75,11 +84,14 @@ class SQLAgent(models.Model):
         max_length=1024,
         help_text="Database connection URI (e.g., 'sqlite:///path/to/db.sqlite')"
     )
+    # Note: llm field moved to Chatbot model (kept here for backward compatibility)
     llm = models.CharField(
         max_length=100,
         choices=Chatbot.MODEL_CHOICES,
         default='Qwen/Qwen2.5-7B-Instruct',
-        help_text="LLM used by SQL agent for this connection"
+        help_text="(Deprecated - use chatbot.sql_llm instead)",
+        blank=True,
+        null=True
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -58,6 +58,7 @@ def run_system_test():
             print(f"⚠️ Agent Error: {result.get('error')}")
     else:
         print(f"❌ Query Request Failed: {query_resp.status_code} - {query_resp.text}")
+    
 
 if __name__ == "__main__":
     try:
