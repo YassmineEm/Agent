@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 
-SQL_AGENT_BASE_URL = env("SQL_AGENT_BASE_URL", default="http://localhost:8001")
+SQL_AGENT_BASE_URL = env("SQL_AGENT_BASE_URL", default="http://localhost:8006")
 RAG_AGENT_BASE_URL = env("RAG_AGENT_BASE_URL", default="http://localhost:8005")
 RAG_AGENT_ADMIN_API_KEY = env("akwa_admin_secret_2025", default="")
 MICROSERVICE_TIMEOUT_SECONDS = env.int("MICROSERVICE_TIMEOUT_SECONDS", default=30)
@@ -15,7 +15,11 @@ SECRET_KEY = 'django-insecure-your-secret-key-here-change-in-production'
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'host.docker.internal',
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -28,12 +32,14 @@ INSTALLED_APPS = [
     # Third party
     'crispy_forms',
     'crispy_tailwind',
+    'corsheaders',
     
     # Local apps
     'dashboard',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -102,3 +108,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
 CRISPY_TEMPLATE_PACK = "tailwind"
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'api.gateway': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]

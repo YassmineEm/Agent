@@ -56,3 +56,4 @@ pytest-asyncio==0.24.0
 openpyxl==3.1.5
 xlrd==2.0.1
 # unstructured[xlsx] supprimé → remplacé par openpyxl direct
+

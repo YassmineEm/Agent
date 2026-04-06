@@ -12,6 +12,7 @@ class Chatbot(models.Model):
         ('gemma3', 'Gemma3'),
         ('phi4', 'Phi4'),
         ('llama3.2:3b', 'Llama 3.2 3B'),
+        ('llama-3.3-70b-versatile', 'Llama 3.3 70B (Groq)'),
     ]
 
     name = models.CharField(max_length=255, unique=True)

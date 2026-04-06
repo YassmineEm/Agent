@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.template.loader import render_to_string
-from .models import Chatbot, RAGAgent, DocumentReference
+from .models import Chatbot, RAGAgent, DocumentReference, SQLAgent
 from .forms import (
     ChatbotForm, SQLAgentForm, RAGAgentForm,
     ActionAgentForm, SQLAgentFormSet, ActionAgentFormSet
@@ -29,28 +29,64 @@ def chatbot_create(request):
         if form.is_valid():
             chatbot = form.save()
 
-            # Create RAG config if enabled
+            # ── FIX: Lire et sauvegarder les connexions SQL (champs array custom) ──
+            if chatbot.sql_enabled:
+                names        = request.POST.getlist('sql_connection_name[]')
+                db_names     = request.POST.getlist('sql_db_name[]')
+                db_types     = request.POST.getlist('sql_db_type[]')
+                conn_strings = request.POST.getlist('sql_connection_string[]')
+                # Les checkboxes non-cochées ne sont pas envoyées, on les gère manuellement
+                # On considère toutes les connexions comme actives par défaut à la création
+                # (le champ is_active peut être raffiné en edit via formset)
+
+                created_count = 0
+                for i, name in enumerate(names):
+                    name     = name.strip()
+                    conn_str = conn_strings[i].strip() if i < len(conn_strings) else ''
+                    if not name or not conn_str:
+                        continue  # ignorer les lignes vides
+
+                    SQLAgent.objects.create(
+                        chatbot=chatbot,
+                        name=name,
+                        db_name=db_names[i].strip() if i < len(db_names) else name,
+                        db_type=db_types[i] if i < len(db_types) else 'postgresql',
+                        connection_string=conn_str,
+                        is_active=True,
+                    )
+                    created_count += 1
+
+                if created_count:
+                    try:
+                        sync_sql_chatbot(chatbot)
+                        messages.success(request, f"SQL Agent synced ({created_count} connexion(s)).")
+                    except ServiceGatewayError as exc:
+                        messages.warning(request, f"Connexions SQL sauvegardées, mais sync échouée : {exc}")
+                else:
+                    messages.warning(request, "SQL activé mais aucune connexion valide fournie.")
+
+            # ── Create RAG config if enabled ─────────────────────────────────
             if chatbot.rag_enabled:
                 rag_config = RAGAgent.objects.create(
                     chatbot=chatbot,
                     use_reranker=request.POST.get('use_reranker') == 'on',
                     use_query_expansion=request.POST.get('use_query_expansion') == 'on',
                     top_k=int(request.POST.get('top_k', 5)),
-                    embedding_model=request.POST.get('embedding_model', 'sentence-transformers/all-MiniLM-L6-v2'),
+                    embedding_model=request.POST.get(
+                        'embedding_model', 'sentence-transformers/all-MiniLM-L6-v2'
+                    ),
                 )
 
-                # Handle file upload during creation
                 uploaded_file = request.FILES.get("file")
                 if uploaded_file:
                     local_doc_type = request.POST.get("doc_type", "other")
-
                     rag_doc_type_map = {
                         "fiche_technique": "fiche_technique",
-                        "faq": "faq",
-                        "manual": "general",
-                        "report": "general",
-                        "guide": "general",
-                        "other": "general",
+                        "faq":             "faq",
+                        "manual":          "general",
+                        "report":          "general",
+                        "guide":           "general",
+                        "other":           "general",
                     }
                     rag_doc_type = rag_doc_type_map.get(local_doc_type, "general")
 
@@ -61,7 +97,6 @@ def chatbot_create(request):
                             doc_type=rag_doc_type,
                             description="",
                         )
-
                         DocumentReference.objects.create(
                             rag_agent=rag_config,
                             name=uploaded_file.name,
@@ -71,21 +106,14 @@ def chatbot_create(request):
                             is_indexed=True,
                             chunks_indexed=result.get("chunks_indexed", 0),
                         )
-                        messages.success(request, f"Document uploaded and indexed: {uploaded_file.name}")
+                        messages.success(request, f"Document indexé : {uploaded_file.name}")
                     except ServiceGatewayError as exc:
-                        messages.warning(request, f"Chatbot created, but RAG upload failed: {exc}")
+                        messages.warning(request, f"Chatbot créé, mais upload RAG échoué : {exc}")
 
-            if chatbot.sql_enabled:
-                try:
-                    sync_sql_chatbot(chatbot)
-                    messages.success(request, "SQL Agent synced successfully.")
-                except ServiceGatewayError as exc:
-                    messages.warning(request, f"Chatbot created, but SQL sync failed: {exc}")
-
-            messages.success(request, f'Chatbot "{chatbot.name}" created successfully!')
+            messages.success(request, f'Chatbot "{chatbot.name}" créé avec succès !')
             return redirect('dashboard:chatbot_detail', pk=chatbot.pk)
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, 'Veuillez corriger les erreurs ci-dessous.')
     else:
         form = ChatbotForm()
 
@@ -99,18 +127,18 @@ def chatbot_create(request):
 def chatbot_detail(request, pk):
     """View chatbot configuration details"""
     chatbot = get_object_or_404(Chatbot, pk=pk)
-    
+
     context = {
         'chatbot': chatbot,
         'sql_connections': chatbot.sql_connections.all(),
         'actions': chatbot.actions.all(),
-        "doc_type_choices" : DocumentReference.DOC_TYPE_CHOICES
+        "doc_type_choices": DocumentReference.DOC_TYPE_CHOICES
     }
-    
+
     if chatbot.rag_enabled and hasattr(chatbot, 'rag_config'):
         context['rag_config'] = chatbot.rag_config
         context['documents'] = chatbot.rag_config.documents.all()
-    
+
     return render(request, 'dashboard/chatbot_detail.html', context)
 
 
@@ -118,19 +146,19 @@ def chatbot_edit(request, pk):
     """Edit existing chatbot configuration"""
     chatbot = get_object_or_404(Chatbot, pk=pk)
     rag_instance = chatbot.rag_config if hasattr(chatbot, 'rag_config') else None
-    
+
     if request.method == 'POST':
         form = ChatbotForm(request.POST, instance=chatbot)
-        sql_formset = SQLAgentFormSet(request.POST, instance=chatbot, prefix='sql')
+        sql_formset    = SQLAgentFormSet(request.POST, instance=chatbot, prefix='sql')
         action_formset = ActionAgentFormSet(request.POST, instance=chatbot, prefix='action')
 
         rag_should_be_enabled = request.POST.get('rag_enabled') == 'on'
         rag_form = RAGAgentForm(request.POST, instance=rag_instance) if rag_should_be_enabled else None
 
-        form_is_valid = form.is_valid()
-        sql_is_valid = sql_formset.is_valid()
+        form_is_valid   = form.is_valid()
+        sql_is_valid    = sql_formset.is_valid()
         action_is_valid = action_formset.is_valid()
-        rag_is_valid = rag_form.is_valid() if rag_form else True
+        rag_is_valid    = rag_form.is_valid() if rag_form else True
 
         if form_is_valid and sql_is_valid and action_is_valid and rag_is_valid:
             chatbot = form.save()
@@ -140,48 +168,49 @@ def chatbot_edit(request, pk):
                 sql_formset.save()
                 try:
                     sync_sql_chatbot(chatbot)
-                    messages.success(request, "SQL Agent synced successfully.")
+                    messages.success(request, "SQL Agent synchronisé.")
                 except ServiceGatewayError as exc:
-                    messages.warning(request, f"SQL saved locally, but sync failed: {exc}")
+                    messages.warning(request, f"SQL sauvegardé localement, sync échouée : {exc}")
             else:
                 chatbot.sql_connections.all().delete()
-            
+
             # Handle RAG configuration
             if chatbot.rag_enabled:
                 rag_config, _ = RAGAgent.objects.get_or_create(chatbot=chatbot)
-                rag_config.use_reranker = rag_form.cleaned_data['use_reranker']
+                rag_config.use_reranker       = rag_form.cleaned_data['use_reranker']
                 rag_config.use_query_expansion = rag_form.cleaned_data['use_query_expansion']
-                rag_config.top_k = rag_form.cleaned_data['top_k']
-                rag_config.embedding_model = rag_form.cleaned_data['embedding_model']
+                rag_config.top_k              = rag_form.cleaned_data['top_k']
+                rag_config.embedding_model    = rag_form.cleaned_data['embedding_model']
                 rag_config.save()
             else:
                 RAGAgent.objects.filter(chatbot=chatbot).delete()
-            
+
             # Handle Actions
             if chatbot.action_enabled:
                 action_formset.save()
             else:
                 chatbot.actions.all().delete()
-            
-            messages.success(request, f'Chatbot "{chatbot.name}" updated successfully!')
+
+            messages.success(request, f'Chatbot "{chatbot.name}" mis à jour !')
             return redirect('dashboard:chatbot_detail', pk=chatbot.pk)
         else:
-            messages.error(request, 'Please correct the errors below.')
+            messages.error(request, 'Veuillez corriger les erreurs ci-dessous.')
     else:
-        form = ChatbotForm(instance=chatbot)
-        sql_formset = SQLAgentFormSet(instance=chatbot, prefix='sql')
+        form           = ChatbotForm(instance=chatbot)
+        sql_formset    = SQLAgentFormSet(instance=chatbot, prefix='sql')
         action_formset = ActionAgentFormSet(instance=chatbot, prefix='action')
-        rag_form = RAGAgentForm(instance=rag_instance) if chatbot.rag_enabled and rag_instance else None
-    
+        rag_form       = RAGAgentForm(instance=rag_instance) if chatbot.rag_enabled and rag_instance else None
+
     context = {
-        'form': form,
-        'chatbot': chatbot,
-        'sql_formset': sql_formset,
+        'form':           form,
+        'chatbot':        chatbot,
+        'sql_formset':    sql_formset,
         'action_formset': action_formset,
-        'rag_form': rag_form,
-        'is_create': False
+        'rag_form':       rag_form,
+        'is_create':      False
     }
     return render(request, 'dashboard/chatbot_form.html', context)
+
 
 @require_http_methods(["POST"])
 def rag_upload_document(request, pk):
@@ -189,24 +218,24 @@ def rag_upload_document(request, pk):
     chatbot = get_object_or_404(Chatbot, pk=pk)
 
     if not chatbot.rag_enabled:
-        messages.error(request, "RAG is not enabled for this chatbot.")
+        messages.error(request, "RAG n'est pas activé pour ce chatbot.")
         return redirect('dashboard:chatbot_detail', pk=chatbot.pk)
 
     uploaded_file = request.FILES.get("file") or request.FILES.get("rag_upload_file")
     if not uploaded_file:
-        messages.error(request, "Please select a file.")
+        messages.error(request, "Veuillez sélectionner un fichier.")
         return redirect('dashboard:chatbot_edit', pk=chatbot.pk)
 
     local_doc_type = request.POST.get("doc_type") or request.POST.get("rag_upload_doc_type") or "other"
-    description = request.POST.get("description", "")
+    description    = request.POST.get("description", "")
 
     rag_doc_type_map = {
         "fiche_technique": "fiche_technique",
-        "faq": "faq",
-        "manual": "general",
-        "report": "general",
-        "guide": "general",
-        "other": "general",
+        "faq":             "faq",
+        "manual":          "general",
+        "report":          "general",
+        "guide":           "general",
+        "other":           "general",
     }
     rag_doc_type = rag_doc_type_map.get(local_doc_type, "general")
 
@@ -217,7 +246,6 @@ def rag_upload_document(request, pk):
             doc_type=rag_doc_type,
             description=description,
         )
-
         rag_config, _ = RAGAgent.objects.get_or_create(chatbot=chatbot)
         DocumentReference.objects.create(
             rag_agent=rag_config,
@@ -228,12 +256,12 @@ def rag_upload_document(request, pk):
             is_indexed=True,
             chunks_indexed=result.get("chunks_indexed", 0),
         )
-
-        messages.success(request, f"Document uploaded and indexed: {uploaded_file.name}")
+        messages.success(request, f"Document indexé : {uploaded_file.name}")
     except ServiceGatewayError as exc:
-        messages.error(request, f"RAG upload failed: {exc}")
+        messages.error(request, f"Upload RAG échoué : {exc}")
 
     return redirect('dashboard:chatbot_edit', pk=chatbot.pk)
+
 
 @require_http_methods(["POST", "GET"])
 def add_sql_row(request):
@@ -258,7 +286,7 @@ def chatbot_delete(request, pk):
     if request.method == 'POST':
         name = chatbot.name
         chatbot.delete()
-        messages.success(request, f'Chatbot "{name}" deleted successfully!')
+        messages.success(request, f'Chatbot "{name}" supprimé !')
         return redirect('dashboard:index')
 
     return render(request, 'dashboard/chatbot_confirm_delete.html', {'chatbot': chatbot})
@@ -270,32 +298,17 @@ def test_sql_agent(request, pk):
     chatbot = get_object_or_404(Chatbot, pk=pk)
 
     if not chatbot.sql_enabled:
-        return JsonResponse({
-            'success': False,
-            'error': 'SQL Agent is not enabled for this chatbot'
-        })
+        return JsonResponse({'success': False, 'error': 'SQL Agent non activé'})
 
     question = request.GET.get('question', '')
     if not question:
-        return JsonResponse({
-            'success': False,
-            'error': 'Question parameter is required'
-        })
+        return JsonResponse({'success': False, 'error': 'Paramètre question requis'})
 
     try:
-        result = query_sql_agent(
-            chatbot_id=chatbot.name,
-            user_question=question
-        )
-        return JsonResponse({
-            'success': True,
-            'result': result
-        })
+        result = query_sql_agent(chatbot_id=chatbot.name, user_question=question)
+        return JsonResponse({'success': True, 'result': result})
     except ServiceGatewayError as exc:
-        return JsonResponse({
-            'success': False,
-            'error': str(exc)
-        })
+        return JsonResponse({'success': False, 'error': str(exc)})
 
 
 @require_http_methods(["POST"])
@@ -304,37 +317,145 @@ def test_rag_agent(request, pk):
     chatbot = get_object_or_404(Chatbot, pk=pk)
 
     if not chatbot.rag_enabled:
-        return JsonResponse({
-            'success': False,
-            'error': 'RAG Agent is not enabled for this chatbot'
-        })
+        return JsonResponse({'success': False, 'error': 'RAG Agent non activé'})
 
     try:
-        data = json.loads(request.body)
+        data     = json.loads(request.body)
         question = data.get('question', '')
     except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'error': 'Invalid JSON in request body'
-        })
+        return JsonResponse({'success': False, 'error': 'JSON invalide'})
 
     if not question:
-        return JsonResponse({
-            'success': False,
-            'error': 'Question parameter is required'
-        })
+        return JsonResponse({'success': False, 'error': 'Paramètre question requis'})
 
     try:
-        result = query_rag_agent(
-            chatbot_id=chatbot.name,
-            question=question
-        )
-        return JsonResponse({
-            'success': True,
-            'result': result
-        })
+        result = query_rag_agent(chatbot_id=chatbot.name, question=question)
+        return JsonResponse({'success': True, 'result': result})
     except ServiceGatewayError as exc:
-        return JsonResponse({
-            'success': False,
-            'error': str(exc)
+        return JsonResponse({'success': False, 'error': str(exc)})
+
+
+@require_http_methods(["GET"])
+def list_chatbots(request):
+    """API endpoint: Get list of all available chatbots"""
+    chatbots = Chatbot.objects.all()
+    data = {
+        'count': chatbots.count(),
+        'chatbots': [
+            {
+                'id':          chatbot.id,
+                'name':        chatbot.name,
+                'description': chatbot.description,
+                'active':      chatbot.is_active,
+            }
+            for chatbot in chatbots
+        ]
+    }
+    return JsonResponse(data)
+
+
+@require_http_methods(["GET"])
+def chatbot_config(request, chat_id):
+    """API endpoint: Get detailed chatbot configuration"""
+    try:
+        chatbot = Chatbot.objects.get(id=chat_id)
+    except Chatbot.DoesNotExist:
+        return JsonResponse({'error': f'Chatbot {chat_id} introuvable'}, status=404)
+
+    chatbot_data = {
+        'id':           chatbot.id,
+        'name':         chatbot.name,
+        'description':  chatbot.description,
+        'system_prompt': chatbot.role,
+        'llm_model':    chatbot.base_model,
+        'active':       chatbot.is_active,
+        'is_default':   getattr(chatbot, 'is_default', False),
+    }
+
+    agents = [
+        {
+            'agent_type':   'sql',
+            'enabled':      chatbot.sql_enabled,
+            'llm_model':    chatbot.sql_llm if chatbot.sql_enabled else None,
+            'agent_prompt': getattr(chatbot, 'sql_agent_prompt', None) if chatbot.sql_enabled else None,
+        },
+        {
+            'agent_type':   'rag',
+            'enabled':      chatbot.rag_enabled,
+            'llm_model':    getattr(chatbot, 'rag_llm', None) if chatbot.rag_enabled else None,
+            'agent_prompt': getattr(chatbot, 'rag_agent_prompt', None) if chatbot.rag_enabled else None,
+        },
+        {'agent_type': 'weather',  'enabled': getattr(chatbot, 'weather_enabled', False)},
+        {'agent_type': 'location', 'enabled': getattr(chatbot, 'location_enabled', False)},
+        {'agent_type': 'custom',   'enabled': chatbot.action_enabled, 'llm_model': None, 'agent_prompt': None},
+    ]
+
+    database_configs = []
+    for sql_conn in chatbot.sql_connections.filter(is_active=True):
+        database_configs.append({
+            'name':             sql_conn.db_name,
+            'db_engine':        sql_conn.db_type,
+            'db_name':          sql_conn.db_name,
+            'host':             getattr(sql_conn, 'host', None),
+            'port':             getattr(sql_conn, 'port', None),
+            'username':         getattr(sql_conn, 'username', None),
+            'password':         getattr(sql_conn, 'password', None),
+            'allowed_tables':   getattr(sql_conn, 'allowed_tables', None),
+            'active':           sql_conn.is_active,
+            'connection_string': sql_conn.connection_string,
+            'agent_prompt':     getattr(sql_conn, 'agent_prompt', None),
         })
+
+    rag_data = None
+    if chatbot.rag_enabled:
+        try:
+            rag_agent = chatbot.rag_config
+            documents = [
+                {'id': doc.id, 'title': doc.name, 'doc_type': doc.doc_type}
+                for doc in rag_agent.documents.all()
+            ]
+            rag_data = {
+                'qdrant_collection': getattr(rag_agent, 'qdrant_collection', None),
+                'documents':         documents,
+                'agent_prompt':      getattr(rag_agent, 'agent_prompt', None),
+            }
+        except RAGAgent.DoesNotExist:
+            rag_data = {'qdrant_collection': None, 'documents': [], 'agent_prompt': None}
+
+    response_data = {
+        'chatbot':          chatbot_data,
+        'agents':           agents,
+        'database_configs': database_configs,
+    }
+    if rag_data:
+        response_data['rag'] = rag_data
+
+    return JsonResponse(response_data)
+
+
+
+def chatbots_sql_list(request):
+    chatbots = (
+        Chatbot.objects
+        .filter(sql_enabled=True, is_active=True)
+        .prefetch_related('sql_connections')
+    )
+    result = []
+    for bot in chatbots:
+        active_dbs = bot.sql_connections.filter(is_active=True)
+        if not active_dbs.exists():
+            continue
+        result.append({
+            "chatbot_id": bot.name,
+            "chatbot_name": bot.name,
+            "model_name": bot.sql_llm or bot.base_model,
+            "databases": [
+                {
+                    "db_id": db.db_id,
+                    "db_name": db.db_name,
+                    "connection_uri": db.connection_string,
+                }
+                for db in active_dbs
+            ]
+        })
+    return JsonResponse({"chatbots": result})

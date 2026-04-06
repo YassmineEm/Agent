@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+
+  weather-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: weather_agent
+    ports:
+      - "8008:8008"
+    env_file:
+      - .env
+    depends_on:
+      redis-weather:
+        condition: service_healthy
+    networks:
+      - weather-net
+      - akwa_net          # ← AJOUTÉ : rejoint le réseau partagé
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis-weather:
+    image: redis:7-alpine
+    container_name: redis_weather
+    networks:
+      - weather-net       # interne seulement — pas besoin d'akwa_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  weather-net:
+    driver: bridge
+  akwa_net:
+    external: true        # ← AJOUTÉ : réseau partagé externe

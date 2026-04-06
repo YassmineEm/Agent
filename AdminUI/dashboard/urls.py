@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import chatbots_sql_list
 
 app_name = 'dashboard'
 
@@ -18,4 +19,9 @@ urlpatterns = [
     # Test endpoints for agents
     path('chatbot/<int:pk>/test/sql/', views.test_sql_agent, name='test_sql_agent'),
     path('chatbot/<int:pk>/test/rag/', views.test_rag_agent, name='test_rag_agent'),
+
+    path('api/chatbots/', views.list_chatbots, name='list_chatbots'),
+    path('api/chatbots/<int:chat_id>/', views.chatbot_config, name='chatbot_config'),
+
+    path('api/chatbots/sql/', chatbots_sql_list, name='chatbots-sql-list'),
 ]

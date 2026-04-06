@@ -84,11 +84,18 @@ class RAGAgent:
 
     @property
     def reranker(self) -> CrossEncoder:
-        """Charge bge-reranker-base en RAM uniquement à la première utilisation."""
+        """Charge le reranker multilingue en RAM uniquement à la première utilisation."""
         if self._reranker is None:
-            log.info("Chargement cross-encoder...", model="BAAI/bge-reranker-base")
-            self._reranker = CrossEncoder("BAAI/bge-reranker-base", max_length=512)
-            log.info("Cross-encoder prêt")
+            log.info(
+                "Chargement cross-encoder multilingue (léger)...",
+                model="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+            )
+            self._reranker = CrossEncoder(
+                "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+                max_length=512,
+                # trust_remote_code=False suffit pour ce modèle (pas besoin de code externe)
+            )
+            log.info("Cross-encoder multilingue prêt")
         return self._reranker
 
 
@@ -321,12 +328,19 @@ class RAGAgent:
             candidates = []
 
         if not candidates:
-            log.warning("Aucun document trouvé", 
-                       question=question[:80], 
-                       chatbot_id=chatbot_id,
-                       trace_id=trace_id)
+            # ← REMPLACER par une réponse multilingue
+            _no_result_messages = {
+                "français":  "Je n'ai pas trouvé d'information pertinente dans la base de connaissances AKWA.",
+                "anglais":   "I couldn't find relevant information in the AKWA knowledge base.",
+                "arabe":     "لم أجد معلومات ذات صلة في قاعدة المعرفة AKWA.",
+                "english":   "I couldn't find relevant information in the AKWA knowledge base.",
+                "arabic":    "لم أجد معلومات ذات صلة في قاعدة المعرفة AKWA.",
+            }
+            lang = detected_language if 'detected_language' in dir() else (language or "français")
+            no_result_msg = _no_result_messages.get(lang, _no_result_messages["français"])
+
             return QueryResponse(
-                answer="Je n'ai pas trouvé d'information pertinente dans la base de connaissances de ce chatbot.",
+                answer=no_result_msg,
                 sources=[],
                 chunks_used=0,
                 confidence=0.0,
@@ -334,7 +348,6 @@ class RAGAgent:
                 model_used=settings.RAG_LLM_MODEL,
                 session_id=session_id,
             )
-
 
         best_docs, rerank_scores = self._rerank(question, candidates, settings.TOP_K_FINAL)
 

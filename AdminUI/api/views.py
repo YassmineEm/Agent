@@ -2,6 +2,8 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from .serializers import AgentSerializer
 from agents.models import Agent
+from django.http import JsonResponse
+from dashboard.models import Chatbot
 
 class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.all()
@@ -34,3 +36,37 @@ class AgentViewSet(viewsets.ModelViewSet):
         agent = self.get_object()
         self.perform_destroy(agent)
         return Response(status=204)
+
+
+    def chatbots_sql_list(request):
+        """
+        Retourne UNIQUEMENT les chatbots avec sql_enabled=True
+        ET au moins une sql_connection active.
+        """
+        chatbots = (
+            Chatbot.objects
+            .filter(sql_enabled=True, is_active=True)
+            .prefetch_related('sql_connections')
+        )
+
+        result = []
+        for bot in chatbots:
+            active_dbs = bot.sql_connections.filter(is_active=True)
+            if not active_dbs.exists():
+                continue  # sql_enabled mais aucune DB configurée → on ignore
+
+            result.append({
+                "chatbot_id": str(bot.id),
+                "chatbot_name": bot.name,
+                "model_name": bot.sql_llm or bot.base_model,
+                "databases": [
+                    {
+                        "db_id": db.db_id,          # property : chatbot_name_db_name
+                        "db_name": db.db_name,
+                        "connection_uri": db.connection_string,
+                    }
+                    for db in active_dbs
+                ]
+            })
+
+        return JsonResponse({"chatbots": result})
