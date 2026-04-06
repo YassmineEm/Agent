@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: akwa_orchestrator
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      OLLAMA_URL:          ${OLLAMA_URL}
+      LLM_SUPERVISOR:      "qwen3:8b"
+      LLM_VALIDATOR:       "phi4"
+      SQL_AGENT_URL:       "http://akwa_sql_agent:8006/query"
+      RAG_AGENT_URL:       "http://akwa_rag_agent:8005/query"
+      LOCATION_AGENT_URL: "http://location_agent:8007/query"
+      WEATHER_AGENT_URL:   "http://weather_agent:8008/query"
+      REDIS_HOST:          "akwa_redis_orch"
+      REDIS_PORT:          "6379"
+      ROUTING_CONFIDENCE_MIN: "0.65"
+      FUSION_CONFIDENCE_MIN:  "0.40"
+      FUSION_STRONG_CONFIDENCE: "0.60"
+      AGENT_TIMEOUT:       "90"
+      MAX_RETRIES:         "1"
+      REDIS_TTL:           "3600"
+      LOG_LEVEL:           "INFO"
+    networks:
+      - akwa_net            # ← même réseau que tous les agents
+    depends_on:
+      redis_orch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+            "import httpx; r=httpx.get('http://localhost:8001/health', timeout=5); r.raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis dédié à l'orchestrateur (séparé du Redis du RAG agent)
+  redis_orch:
+    image: redis:7.4-alpine
+    container_name: akwa_redis_orch
+    restart: unless-stopped
+    ports:
+      - "6380:6379"           # port hôte différent pour éviter conflit avec redis RAG (:6379)
+    volumes:
+      - redis_orch_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - akwa_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_orch_data:
+    driver: local
+
+networks:
+  akwa_net:
+    external: true            # réseau partagé créé manuellement
