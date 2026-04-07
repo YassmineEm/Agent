@@ -6,6 +6,8 @@ from app.utils.logger import get_logger
 
 log = get_logger(__name__)
 
+
+
 ROUTING_TOOLS = [
     {
         "type": "function",
@@ -72,23 +74,6 @@ ROUTING_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "route_dynamic",
-            "description": (
-                "Utilise pour tout agent configuré dynamiquement par l'admin : "
-                "APIs externes, données cloud, prix personnalisés, sources spécifiques "
-                "qui ne correspondent pas aux agents standards."
-            ),
-            "parameters": {"type": "object", "properties": {
-                "agent_key":  { "type": "string",
-                                "description": "Clé de l'agent dynamique si connue"},
-                "confidence": {"type": "number"},
-                "reason":     {"type": "string"}
-            }, "required": ["confidence", "reason"]}
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "route_multi",
             "description": (
                 "Utilise quand la question nécessite PLUSIEURS agents. "
@@ -124,6 +109,17 @@ ROUTING_TOOLS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "route_direct",
+            "description": "Utilise pour les conversations générales, salutations, remerciements, présentations, ou toute question ne nécessitant AUCUN accès à une base de données, documentation, localisation ou météo. Le LLM répondra directement.",
+            "parameters": {"type": "object", "properties": {
+                "confidence": {"type": "number"},
+                "reason": {"type": "string"}
+            }, "required": ["confidence", "reason"]}
+        }
+    },
 ]
 
 TOOL_TO_AGENTS = {
@@ -132,6 +128,7 @@ TOOL_TO_AGENTS = {
     "route_location": ["location"],
     "route_weather":  ["weather"],
     "route_multi":    None,
+    "route_direct":   [],
 }
 
 
@@ -166,6 +163,7 @@ async def route(
                 "RÈGLE ABSOLUE pour les questions de localisation (station proche, carte) :\n"
                 "→ Utilise TOUJOURS route_multi avec agents=[sql, location] et strategy=sequential.\n"
                 "→ Ne jamais appeler route_location seul : le location agent a besoin des stations SQL.\n"
+                "IMPORTANT : Si la question est une simple conversation (salutation, remerciement, présentation, question sur ton identité, etc.), utilise route_direct."
                 "IMPORTANT pour route_multi :\n"
                 "- PARALLEL si les agents sont indépendants (peuvent s'exécuter en même temps).\n"
                 "- SEQUENTIAL si le résultat du 1er agent est nécessaire pour la question du 2ème.\n"
@@ -201,12 +199,9 @@ async def route(
                         agents.append(a)
                 strategy = args.get("strategy", "parallel")
                 log.info("Dédoublonnage agents", avant=agents_raw, apres=agents)  
-            elif tool_name == "route_dynamic":           # ← NOUVEAU BLOC
-                agents    = ["dynamic"]
-                strategy  = "parallel"
-                agent_key = args.get("agent_key", "")
-                if agent_key:
-                    log.info("Dynamic agent key détecté", agent_key=agent_key) # ← récupéré du LLM
+            elif tool_name == "route_direct":
+                agents = []
+                strategy = "parallel"
             else:
                 agents   = [a for a in TOOL_TO_AGENTS.get(tool_name, ["rag"]) if a not in tried]
                 strategy = "parallel"   # 1 seul agent → toujours parallel
@@ -228,8 +223,10 @@ async def route(
     try:
         prompt = f"""Tu es un router d'agents. Réponds UNIQUEMENT en JSON valide.
 
-Agents: sql, rag, location, weather
+Agents: sql, rag, location, weather, direct (pour réponse directe sans agent)
 Question: {question}
+
+Si direct: {{"agent": "direct", "confidence": 0.9, "reason": "conversation simple"}}
 
 Si 1 agent:
 {{"agent": "sql|rag|location|weather", "confidence": 0.0-1.0, "reason": "..."}}
@@ -241,7 +238,8 @@ Si multi-agents séquentiels (l'un dépend de l'autre):
 {{"agents": ["sql","rag"], "strategy": "sequential", "confidence": 0.0-1.0, "reason": "..."}}"""
 
         data = await generate_json(LLM_SUPERVISOR, prompt)
-
+        if data.get("agent") == "direct":
+            return [], float(data.get("confidence", 0.9)), "json_direct", "parallel"
         if "agents" in data:
             agents   = [a for a in data["agents"] if a not in tried]
             strategy = data.get("strategy", "parallel")

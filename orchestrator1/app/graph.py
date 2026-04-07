@@ -1,6 +1,7 @@
 import uuid
 import asyncio
 from typing import Literal
+from app.config import LLM_VALIDATOR
 
 from langgraph.graph import StateGraph, END
 
@@ -93,6 +94,44 @@ async def node_router(state: OrchestratorState) -> OrchestratorState:
         "execution_strategy": strategy,
     }
 
+# NOUVEAU NŒUD : Réponse directe du LLM (sans agent)
+# ═══════════════════════════════════════════════════════════════════
+async def node_direct_answer(state: OrchestratorState) -> OrchestratorState:
+    """Génère une réponse conversationnelle directe sans appeler d'agent."""
+    question = state["question"]
+    language = state.get("language", "fr")
+    
+    prompt = f"""Tu es un assistant conversationnel utile et amical. Réponds naturellement à l'utilisateur.
+
+Question : {question}
+
+Règles :
+- Sois concis et chaleureux.
+- Ne cherche pas à utiliser des données externes.
+- Réponds en {language}.
+
+Réponse :"""
+    
+    try:
+        answer = await generate(LLM_VALIDATOR, prompt)
+        answer = answer.strip()
+        log.info("Réponse directe LLM", question=question[:40], answer=answer[:60])
+        return {
+            **state,
+            "final_answer": answer,
+            "agents_used": [],
+            "validation_status": "PASS",
+            "from_cache": False,
+        }
+    except Exception as e:
+        log.error("Erreur réponse directe", error=str(e))
+        return {
+            **state,
+            "final_answer": "Désolé, je n'arrive pas à répondre pour le moment.",
+            "agents_used": [],
+            "validation_status": "PASS",
+        }
+
 async def node_planner(state: OrchestratorState) -> OrchestratorState:
     """Décompose la question réécrite si multi-agent."""
     q_to_process = state.get("rewritten_question") or state["question"]
@@ -176,6 +215,7 @@ def build_graph():
     workflow.add_node("cache_check",   node_cache_check)
     workflow.add_node("rewrite",       node_rewrite) # ← AJOUTÉ
     workflow.add_node("router",        node_router)
+    workflow.add_node("direct_answer", node_direct_answer)
     workflow.add_node("planner",       node_planner)
     workflow.add_node("executor",      node_executor)
     workflow.add_node("validator",     node_validator)
@@ -195,10 +235,11 @@ def build_graph():
 
     workflow.add_conditional_edges(
         "router",
-        lambda s: "planner" if s.get("agents_to_call") else "clarification",
-        {"planner": "planner", "clarification": "clarification"},
+        lambda s: "direct_answer" if not s.get("agents_to_call") else "planner",
+        {"direct_answer": "direct_answer", "planner": "planner"},
     )
 
+    workflow.add_edge("direct_answer", "save")
     workflow.add_edge("planner",   "executor")
     workflow.add_edge("executor",  "validator")
 
