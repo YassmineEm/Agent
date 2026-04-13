@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-OLLAMA_URL     = os.getenv("OLLAMA_URL", "https://displayed-pin-least-preview.trycloudflare.com")
+OLLAMA_URL     = os.getenv("OLLAMA_URL", "https://soul-extremely-rubber-civic.trycloudflare.com")
 LLM_SUPERVISOR = os.getenv("LLM_SUPERVISOR", "qwen3:8b")
 LLM_VALIDATOR  = os.getenv("LLM_VALIDATOR",  "phi4")
 

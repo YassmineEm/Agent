@@ -1,7 +1,8 @@
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import JsonOutputParser
 
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
+
 
 def get_local_llm(model_name="llama-3.3-70b-versatile"):
     """

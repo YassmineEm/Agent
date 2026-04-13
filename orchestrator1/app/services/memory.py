@@ -133,3 +133,23 @@ def get_recent_turns(session_id: str) -> list[dict]:
         return [json.loads(i) for i in items]
     except Exception:
         return []
+    
+
+def get_turn_count(session_id: str) -> int:
+    """Récupère le compteur de tours de la session depuis Redis."""
+    if not r or not session_id:
+        return 0
+    try:
+        val = r.get(f"orch:session:{session_id}:turn_count")
+        return int(val) if val else 0
+    except Exception:
+        return 0
+
+def save_turn_count(session_id: str, count: int):
+    """Persiste le compteur de tours en Redis."""
+    if not r or not session_id:
+        return
+    try:
+        r.setex(f"orch:session:{session_id}:turn_count", SESSION_SUMMARY_TTL, str(count))
+    except Exception:
+        pass

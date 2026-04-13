@@ -1,423 +1,301 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Base SQLite - AlloCarburant
-Domaine : Stations, Stocks, Approvisionnements, Cuves, Alertes, Ventes
-Chemin  : C:/Users/dell/Agent-Conversationnel-Omnicanal/sql_agent/database/commandes.db
+create_db.py - Création de la base de données SQLite AlloCarburant
+Version corrigée - Gère correctement les colonnes ID auto-incrémentées
 """
 
-import sqlite3, random
-from datetime import datetime, timedelta
+import sqlite3
+import os
+import re
 
-DB_PATH = r"C:\Users\dell\Agent-Conversationnel-Omnicanal\sql_agent\database\commandes.db"
-DB_LOCAL = DB_PATH  # change this line if running locally
-# Pour génération locale (CI)
+# =============================================
+# CONFIGURATION
+# =============================================
 
+DB_PATH = r"C:\Users\dell\Agent-Conversationnel-Omnicanal\carburant.db"
 
-con = sqlite3.connect(DB_PATH)
-cur = con.cursor()
+# =============================================
+# CRÉATION DE LA BASE
+# =============================================
 
-# ═══════════════════════════════════════════════════
-# SCHÉMA
-# ═══════════════════════════════════════════════════
-cur.executescript("""
-DROP TABLE IF EXISTS stations;
-DROP TABLE IF EXISTS carburants;
-DROP TABLE IF EXISTS cuves;
-DROP TABLE IF EXISTS stocks;
-DROP TABLE IF EXISTS approvisionnements;
-DROP TABLE IF EXISTS ventes_journalieres;
-DROP TABLE IF EXISTS alertes_stock;
-DROP TABLE IF EXISTS maintenances;
-DROP TABLE IF EXISTS fournisseurs;
-DROP TABLE IF EXISTS prix_historique;
-
--- Stations service
-CREATE TABLE stations (
-    id              INTEGER PRIMARY KEY,
-    nom             TEXT NOT NULL,
-    code            TEXT UNIQUE,
-    ville           TEXT,
-    region          TEXT,
-    adresse         TEXT,
-    telephone       TEXT,
-    responsable     TEXT,
-    nb_pistolets    INTEGER,
-    superficie_m2   INTEGER,
-    statut          TEXT DEFAULT 'active',  -- active / maintenance / fermée
-    date_ouverture  TEXT,
-    latitude        REAL,
-    longitude       REAL
-);
-
--- Types de carburant
-CREATE TABLE carburants (
-    id          INTEGER PRIMARY KEY,
-    code        TEXT UNIQUE,
-    nom         TEXT,
-    prix_achat  REAL,
-    prix_vente  REAL,
-    unite       TEXT DEFAULT 'litre'
-);
-
--- Cuves par station (une station peut avoir plusieurs cuves par carburant)
-CREATE TABLE cuves (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    station_id      INTEGER,
-    carburant_id    INTEGER,
-    numero_cuve     TEXT,
-    capacite_max_L  REAL,
-    seuil_alerte_L  REAL,
-    date_installation TEXT,
-    statut          TEXT DEFAULT 'opérationnelle',
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (carburant_id) REFERENCES carburants(id)
-);
-
--- Stock actuel par cuve
-CREATE TABLE stocks (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    cuve_id         INTEGER UNIQUE,
-    station_id      INTEGER,
-    carburant_id    INTEGER,
-    volume_actuel_L REAL,
-    derniere_maj    TEXT,
-    FOREIGN KEY (cuve_id) REFERENCES cuves(id),
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (carburant_id) REFERENCES carburants(id)
-);
-
--- Fournisseurs
-CREATE TABLE fournisseurs (
-    id      INTEGER PRIMARY KEY,
-    nom     TEXT,
-    contact TEXT,
-    region  TEXT,
-    delai_livraison_h INTEGER
-);
-
--- Approvisionnements (livraisons de carburant aux stations)
-CREATE TABLE approvisionnements (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    numero          TEXT UNIQUE,
-    station_id      INTEGER,
-    carburant_id    INTEGER,
-    fournisseur_id  INTEGER,
-    volume_commande_L REAL,
-    volume_livre_L  REAL,
-    prix_unitaire   REAL,
-    montant_total   REAL,
-    statut          TEXT,  -- commandé / livré / partiel / annulé
-    date_commande   TEXT,
-    date_livraison_prevue TEXT,
-    date_livraison_reelle TEXT,
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (carburant_id) REFERENCES carburants(id),
-    FOREIGN KEY (fournisseur_id) REFERENCES fournisseurs(id)
-);
-
--- Ventes journalières par station et carburant
-CREATE TABLE ventes_journalieres (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    station_id      INTEGER,
-    carburant_id    INTEGER,
-    date_vente      TEXT,
-    volume_vendu_L  REAL,
-    montant_MAD     REAL,
-    nb_transactions INTEGER,
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (carburant_id) REFERENCES carburants(id)
-);
-
--- Alertes stock (générées automatiquement quand stock < seuil)
-CREATE TABLE alertes_stock (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    station_id      INTEGER,
-    cuve_id         INTEGER,
-    carburant_id    INTEGER,
-    type_alerte     TEXT,  -- critique / faible / normal
-    volume_au_moment_L REAL,
-    seuil_L         REAL,
-    message         TEXT,
-    statut          TEXT DEFAULT 'active',  -- active / résolue
-    date_alerte     TEXT,
-    date_resolution TEXT,
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (cuve_id) REFERENCES cuves(id)
-);
-
--- Maintenances cuves / stations
-CREATE TABLE maintenances (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    station_id      INTEGER,
-    cuve_id         INTEGER,
-    type_maintenance TEXT,  -- nettoyage / inspection / réparation / calibration
-    description     TEXT,
-    statut          TEXT,   -- planifiée / en_cours / terminée
-    date_planifiee  TEXT,
-    date_debut      TEXT,
-    date_fin        TEXT,
-    cout_MAD        REAL,
-    technicien      TEXT,
-    FOREIGN KEY (station_id) REFERENCES stations(id),
-    FOREIGN KEY (cuve_id) REFERENCES cuves(id)
-);
-
--- Historique prix carburant
-CREATE TABLE prix_historique (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    carburant_id    INTEGER,
-    prix_achat      REAL,
-    prix_vente      REAL,
-    date_application TEXT,
-    FOREIGN KEY (carburant_id) REFERENCES carburants(id)
-);
-""")
-
-# ═══════════════════════════════════════════════════
-# DONNÉES DE RÉFÉRENCE
-# ═══════════════════════════════════════════════════
-
-STATIONS_DATA = [
-    (1,"Station Ain Sebaa",    "STA-001","Casablanca","Grand Casablanca","Bd Zerktouni, Ain Sebaa",      "0522-111-001","Khalid Mansouri",8,1200,"active","2015-03-10",33.6038,-7.5241),
-    (2,"Station Hay Hassani",  "STA-002","Casablanca","Grand Casablanca","Route de Médiouna, Hay Hassani","0522-111-002","Samira Tazi",    6, 900,"active","2017-06-15",33.5522,-7.6631),
-    (3,"Station Agdal",        "STA-003","Rabat",     "Rabat-Salé-Kénitra","Av. Fal Ould Oumeir, Agdal",   "0537-222-001","Omar Benali",   10,1500,"active","2012-01-20",33.9988,-6.8529),
-    (4,"Station Salé Médina",  "STA-004","Salé",      "Rabat-Salé-Kénitra","Bd Hassan II, Salé",            "0537-222-002","Nadia Chraibi",  6, 800,"active","2018-09-05",34.0377,-6.8084),
-    (5,"Station Guéliz",       "STA-005","Marrakech", "Marrakech-Safi",   "Av. Mohammed VI, Guéliz",       "0524-333-001","Rachid Ouali",   8,1100,"active","2014-04-12",31.6340,-8.0106),
-    (6,"Station Route Fès",    "STA-006","Marrakech", "Marrakech-Safi",   "Route de Fès km 5",             "0524-333-002","Hassan Idrissi", 4, 600,"maintenance","2016-07-30",31.6920,-7.9810),
-    (7,"Station Ville Nouvelle","STA-007","Fès",      "Fès-Meknès",       "Bd Allal El Fassi, Ville Nouvelle","0535-444-001","Fatima Amrani",6, 850,"active","2013-11-18",34.0346,-5.0010),
-    (8,"Station Tanger Port",  "STA-008","Tanger",    "Tanger-Tétouan-Al Hoceima","Av. du Port, Tanger",  "0539-555-001","Youssef Zouine",10,1400,"active","2011-05-25",35.7595,-5.8340),
-    (9,"Station Agadir Talborjt","STA-009","Agadir",  "Souss-Massa",      "Av. du Prince Héritier, Talborjt","0528-666-001","Aziz Berrada",8,1000,"active","2016-02-14",30.4278,-9.5981),
-    (10,"Station Meknès Centre","STA-010","Meknès",   "Fès-Meknès",       "Av. Hassan II, Centre Ville",   "0535-777-001","Leila Hajji",    6, 750,"active","2019-03-08",33.8935,-5.5473),
-    (11,"Station Oujda Est",   "STA-011","Oujda",     "Oriental",         "Route de Nador, Oujda",         "0536-888-001","Karim Filali",   4, 550,"active","2020-01-15",34.6867,-1.8990),
-    (12,"Station Kénitra",     "STA-012","Kénitra",   "Rabat-Salé-Kénitra","Bd Mohammed V, Kénitra",       "0537-999-001","Sara Alaoui",    6, 700,"fermée","2010-08-20",34.2610,-6.5802),
-]
-
-CARBURANTS_DATA = [
-    (1,"GO",   "Gasoil",              8.30, 9.50, "litre"),
-    (2,"SP95", "Super Sans Plomb 95",12.80,13.90, "litre"),
-    (3,"SP98", "Super Sans Plomb 98",13.50,14.80, "litre"),
-    (4,"FD",   "Fuel Domestique",     9.10,10.20, "litre"),
-    (5,"HFO",  "Fuel Industriel",     7.60, 8.40, "litre"),
-    (6,"GOP",  "Gasoil Pêche",        7.00, 7.80, "litre"),
-]
-
-FOURNISSEURS_DATA = [
-    (1,"AFRIQUIA SMDC",   "0522-400-000","National",     36),
-    (2,"TOTAL MAROC",     "0522-500-000","National",     48),
-    (3,"SHELL MAROC",     "0522-600-000","National",     48),
-    (4,"PETROM",          "0522-700-000","Casablanca",   24),
-    (5,"ZINE PETROLEUM",  "0522-800-000","Casablanca",   30),
-]
-
-cur.executemany("INSERT INTO stations VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", STATIONS_DATA)
-cur.executemany("INSERT INTO carburants VALUES (?,?,?,?,?,?)", CARBURANTS_DATA)
-cur.executemany("INSERT INTO fournisseurs VALUES (?,?,?,?,?)", FOURNISSEURS_DATA)
-
-# ═══════════════════════════════════════════════════
-# CUVES (2-3 cuves par station par carburant principal)
-# ═══════════════════════════════════════════════════
-cuve_id = 0
-cuve_map = {}  # (station_id, carburant_id) -> [cuve_ids]
-
-# Chaque station active a GO + SP95 obligatoire, et selon taille d'autres carburants
-carbs_par_station = {
-    1:[1,2,3,4],2:[1,2,4],3:[1,2,3,4,5],4:[1,2],
-    5:[1,2,3,4],6:[1,2],  7:[1,2,3],    8:[1,2,3,5],
-    9:[1,2,3,4],10:[1,2,3],11:[1,2],    12:[1,2],
-}
-
-CAPACITES = [10000, 15000, 20000, 30000]
-for s_id, carb_list in carbs_par_station.items():
-    for c_id in carb_list:
-        n_cuves = 2 if s_id in [4,6,11,12] else (3 if c_id==1 else 2)
-        for n in range(1, n_cuves+1):
-            cuve_id += 1
-            cap = random.choice(CAPACITES)
-            seuil = cap * 0.15
-            statut_cuve = "opérationnelle"
-            if s_id == 6:  statut_cuve = "en maintenance"
-            if s_id == 12: statut_cuve = "hors service"
-            cur.execute("INSERT INTO cuves VALUES (?,?,?,?,?,?,?,?)", (
-                cuve_id, s_id, c_id,
-                f"C{s_id:02d}-{c_id:02d}-{n:02d}",
-                cap, seuil,
-                f"20{random.randint(10,22):02d}-{random.randint(1,12):02d}-{random.randint(1,28):02d}",
-                statut_cuve
-            ))
-            cuve_map.setdefault((s_id, c_id), []).append((cuve_id, cap, seuil))
-
-# ═══════════════════════════════════════════════════
-# STOCKS ACTUELS
-# ═══════════════════════════════════════════════════
-now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-alerte_id = 0
-
-for (s_id, c_id), cuves in cuve_map.items():
-    for (cv_id, cap, seuil) in cuves:
-        # stations en maintenance/fermée ont stocks bas ou nuls
-        if s_id == 12:
-            vol = 0.0
-        elif s_id == 6:
-            vol = round(random.uniform(0, seuil * 0.5), 0)
-        else:
-            # 80% du temps stock normal, 15% faible, 5% critique
-            r = random.random()
-            if r < 0.05:
-                vol = round(random.uniform(0, seuil * 0.5), 0)       # critique
-            elif r < 0.20:
-                vol = round(random.uniform(seuil * 0.5, seuil), 0)   # faible
-            else:
-                vol = round(random.uniform(seuil, cap * 0.9), 0)     # normal
-
-        cur.execute("INSERT INTO stocks VALUES (NULL,?,?,?,?,?)",
-                    (cv_id, s_id, c_id, vol, now_str))
-
-        # Générer alerte si stock bas
-        if vol <= seuil:
-            type_a = "critique" if vol <= seuil * 0.5 else "faible"
-            date_a = (datetime.now() - timedelta(hours=random.randint(1,48))).strftime("%Y-%m-%d %H:%M")
-            statut_a = "active" if vol < seuil * 0.3 else random.choice(["active","résolue"])
-            date_r = None
-            if statut_a == "résolue":
-                date_r = (datetime.now() - timedelta(hours=random.randint(0,24))).strftime("%Y-%m-%d %H:%M")
-            cur.execute("INSERT INTO alertes_stock VALUES (NULL,?,?,?,?,?,?,?,?,?,?)", (
-                s_id, cv_id, c_id, type_a, vol, seuil,
-                f"Stock {type_a} : {vol:.0f}L / seuil {seuil:.0f}L",
-                statut_a, date_a, date_r
-            ))
-
-# ═══════════════════════════════════════════════════
-# APPROVISIONNEMENTS (300 livraisons sur 12 mois)
-# ═══════════════════════════════════════════════════
-def rand_date(days_back=365):
-    return datetime.now() - timedelta(
-        days=random.randint(0, days_back),
-        hours=random.randint(0, 23)
+def create_database():
+    """Crée la base de données SQLite avec les données des fichiers SQL"""
+    
+    print("=" * 60)
+    print("  CRÉATION DE LA BASE DE DONNÉES ALLOCARBURANT")
+    print("=" * 60)
+    
+    # Supprimer l'ancienne base si elle existe
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+        print(f"🗑️ Ancienne base supprimée: {DB_PATH}")
+    
+    # Connexion à SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    print(f"\n📁 Création de: {DB_PATH}\n")
+    
+    # =========================================
+    # 1. CRÉATION DES TABLES
+    # =========================================
+    print("--- Étape 1: Création des tables ---")
+    
+    # Table data_stations (sans id auto-incrémenté dans l'insert)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS data_stations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code_station TEXT,
+        nom_station_fr TEXT,
+        nom_station_ar TEXT,
+        latitude REAL,
+        longitude REAL,
+        ville TEXT,
+        address_fr TEXT,
+        address_ar TEXT
     )
+    """)
+    print("  ✅ Table data_stations créée")
+    
+    # Table station_produit_prix_rel
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS station_produit_prix_rel (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code_station TEXT NOT NULL,
+        code_produit TEXT NOT NULL,
+        prix REAL,
+        unite TEXT DEFAULT 'L',
+        date_du TEXT,
+        date_au TEXT
+    )
+    """)
+    print("  ✅ Table station_produit_prix_rel créée")
+    
+    # Table data_pdvs_lubrifiant
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS data_pdvs_lubrifiant (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom_fr TEXT,
+        nom_ar TEXT,
+        telephone TEXT,
+        latitude REAL,
+        longitude REAL
+    )
+    """)
+    print("  ✅ Table data_pdvs_lubrifiant créée")
+    
+    # Création des index
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_stations_code ON data_stations(code_station)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_prix_station ON station_produit_prix_rel(code_station)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_prix_produit ON station_produit_prix_rel(code_produit)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pdvs_nom ON data_pdvs_lubrifiant(nom_fr)")
+    print("  ✅ Index créés")
+    
+    conn.commit()
+    
+    # =========================================
+    # 2. INSERTION DES DONNÉES - DATA STATIONS
+    # =========================================
+    print("\n--- Étape 2: Insertion des données ---")
+    
+    # Données des stations (40 stations)
+    stations_data = [
+        ('957', 'AL AMAL', 'محطة الأمل', 34.219719, -6.589476, 'Kénitra', 'Avenue Mohammed V KM 6, Kénitra', 'شارع Mohammed V كم 3، Kénitra'),
+        ('702', 'AL BARAKA', 'محطة البركة', 29.67791, -9.729433, 'Tiznit', 'CT 7873 PK 270+678 Douar Bni Said, Province Casablanca', 'بوليفارد Yacoub El Mansour، حي Hay Hassani، Tiznit'),
+        ('1544', 'AL FIRDAOUS', 'محطة الفردوس', 33.535632, -5.159617, 'Ifrane', 'Zone Industrielle Sapino, Lot 40, Ifrane', 'طث 2025 نك 6+237 دوار Ait Hammou، إقليم Fès-Meknès'),
+        ('1554', 'AL MASSIRA', 'محطة المسيرة', 31.62282, -8.030244, 'Marrakech', 'Angle Rue Al Quds et Rue Oqba Ibn Nafii, Marrakech', 'بوليفارد Massira، حي Hay Nahda، Marrakech'),
+        ('2832', 'AL MOUKHTAR', 'محطة المختار', 31.51743, -9.766282, 'Essaouira', 'Boulevard Zerktouni, Quartier Hay Nahda, Essaouira', 'طريق Tanger كم 29، مخرج Essaouira'),
+        ('9350', 'AL WAFA', 'محطة الوفاء', 34.63991, -1.926897, 'Oujda', 'Zone Industrielle Ouled Saleh, Lot 102, Oujda', 'طو رقم 16 نك 176+812 جماعة Ait Ourir، إقليم Casablanca'),
+        ('3253', 'ATLAS', 'محطة الأطلس', 33.572506, -5.122663, 'Ifrane', 'RN N° 14 PK 193+612 Commune Oulad Ayad, Province de Marrakech-Safi', 'شارع Ibn Tachfine كم 9، Ifrane'),
+        ('899', 'BAB DOUKKALA', 'محطة باب دكالة', 30.390134, -9.605288, 'Agadir', 'CT 5730 PK 245+647 Douar Ait Hammou, Province Béni Mellal-Khénifra', 'زاوية شارع Liberté وشارع Imam Malik، Agadir'),
+        ('2818', 'BOULEVARD ZERKTOUNI', 'محطة شارع الزرقطوني', 29.721062, -9.728477, 'Tiznit', 'Route de Essaouira KM 4, Sortie Tiznit', 'طث 4410 نك 31+683 دوار Oulad Brahim، إقليم Oriental'),
+        ('279', 'CHAMS', 'محطة الشمس', 32.352921, -6.345107, 'Béni Mellal', 'RN N° 8 PK 224+815 Commune Oulad Ayad, Province de Marrakech-Safi', 'طريق Meknès كم 29، مخرج Béni Mellal'),
+        ('5881', 'DAR SALAM', 'محطة دار السلام', 33.276861, -7.586097, 'Berrechid', 'Zone Industrielle Lissasfa, Lot 47, Berrechid', 'طو رقم 6 نك 45+438 جماعة Ouled Moussa، إقليم Rabat-Salé'),
+        ('2300', 'EL FATH', 'محطة الفتح', 30.873018, -6.899653, 'Ouarzazate', 'Route de Agadir KM 22, Sortie Ouarzazate', 'طريق Marrakech كم 18، مخرج Ouarzazate'),
+        ('153', 'EL WAHDA', 'محطة الوحدة', 31.493554, -9.733615, 'Essaouira', 'RP 8849 PK 194+836 Centre Sidi Bennour', 'المنطقة الصناعية Sapino، القطعة 26، Essaouira'),
+        ('2086', 'HASSAN II', 'محطة الحسن الثاني', 32.721528, -4.747889, 'Midelt', 'RP 2081 PK 67+358 Centre Beni Yakhlef', 'شارع Abdelkrim Khattabi كم 22، Midelt'),
+        ('1473', 'HAY MOHAMMADI', 'محطة حي المحمدي', 30.431413, -9.60597, 'Agadir', 'Angle Rue Al Quds et Rue Oqba Ibn Nafii, Agadir', 'بوليفارد Ghandi، حي Hay Salam، Agadir'),
+        ('6665', 'IBN SINA', 'محطة ابن سينا', 33.707934, -7.346823, 'Mohammedia', 'Zone Industrielle Bouskoura, Lot 13, Mohammedia', 'المنطقة الصناعية Ouled Saleh، القطعة 131، Mohammedia'),
+        ('3115', 'JARDINS', 'محطة الجنان', 33.268314, -7.564518, 'Berrechid', 'Avenue Ibn Tachfine KM 30, Berrechid', 'طو 1686 نك 289+700 مركز Skhirat'),
+        ('1293', 'KASBAH', 'محطة القصبة', 34.688782, -1.86107, 'Oujda', 'Avenue Abdelkrim Khattabi KM 11, Oujda', 'طو رقم 17 نك 74+477 جماعة Ouled Moussa، إقليم Marrakech-Safi'),
+        ('185', 'LAYMOUNE', 'محطة الليمون', 32.967277, -7.631582, 'Settat', 'CT 1237 PK 35+537 Douar Oulad Brahim, Province Oriental', 'المنطقة الصناعية Sapino، القطعة 174، Settat'),
+        ('333', 'MAARIF', 'محطة المعاريف', 33.276206, -8.457786, 'El Jadida', 'RP 2205 PK 279+418 Centre Ouled Moussa', 'طث 9350 نك 97+287 دوار Oulad Ziane، إقليم Fès-Meknès'),
+        ('4313', 'NAKHIL', 'محطة النخيل', 31.648742, -7.994281, 'Marrakech', 'Route de Casablanca KM 23, Sortie Marrakech', 'شارع Bir Anzarane كم 17، Marrakech'),
+        ('6009', 'OASIS', 'محطة الواحة', 34.684839, -1.872033, 'Oujda', 'CT 8322 PK 107+438 Douar Oulad Ziane, Province Béni Mellal-Khénifra', 'زاوية شارع Oqba Ibn Nafii وشارع Ibn Rochd، Oujda'),
+        ('8443', 'PLACE JAMAA', 'محطة ساحة الجامع', 34.231008, -4.033029, 'Taza', 'Route de Rabat KM 19, Sortie Taza', 'بوليفارد Yacoub El Mansour، حي Hay Nahda، Taza'),
+        ('7429', 'RAHMA', 'محطة الرحمة', 33.541191, -7.562631, 'Casablanca', 'Boulevard Zerktouni, Quartier Hay Nahda, Casablanca', 'طريق Agadir كم 15، مخرج Casablanca'),
+        ('9947', 'RIAD', 'محطة الرياض', 30.469243, -9.633729, 'Agadir', 'Route de Oujda KM 17, Sortie Agadir', 'زاوية شارع Al Quds وشارع Oqba Ibn Nafii، Agadir'),
+        ('1583', 'SALAM', 'محطة السلام', 32.338594, -6.302088, 'Béni Mellal', 'Avenue Moulay Ismail KM 4, Béni Mellal', 'شارع Allal Ben Abdellah كم 12، Béni Mellal'),
+        ('7430', 'TARIK', 'محطة طارق', 35.133858, -2.954673, 'Nador', 'Zone Industrielle Lissasfa, Lot 137, Nador', 'طث 4890 نك 118+258 دوار Oulad Brahim، إقليم Béni Mellal-Khénifra'),
+        ('4537', 'YASMINE', 'محطة الياسمين', 30.426953, -9.581128, 'Agadir', 'Boulevard Ghandi, Quartier Hay Salam, Agadir', 'طث 8607 نك 48+475 دوار Oulad Ziane، إقليم Oriental'),
+        ('8580', 'ZAHRA', 'محطة الزهراء', 32.955772, -7.580771, 'Settat', 'Zone Industrielle Ouled Saleh, Lot 164, Settat', 'طريق Marrakech كم 9، مخرج Settat'),
+        ('3911', 'ZITOUN', 'محطة الزيتون', 33.192236, -8.506898, 'El Jadida', 'RN N° 1 PK 190+728 Commune Ouled Moussa, Province de Oriental', 'طو 7591 نك 299+818 مركز Skhirat'),
+        ('910', 'AIN SEBAA', 'محطة عين السبع', 30.904962, -6.87557, 'Ouarzazate', 'Route de Meknès KM 28, Sortie Ouarzazate', 'طريق Agadir كم 2، مخرج Ouarzazate'),
+        ('6330', 'ANFA', 'محطة أنفا', 30.440813, -8.867191, 'Taroudant', 'Boulevard Massira, Quartier Hay Hassani, Taroudant', 'شارع Allal Ben Abdellah كم 7، Taroudant'),
+        ('2799', 'BOURGOGNE', 'محطة بورغون', 29.02866, -10.033012, 'Guelmim', 'Route de Marrakech KM 28, Sortie Guelmim', 'شارع Mohammed V كم 22، Guelmim'),
+        ('4681', 'CIL', 'محطة سيل', 31.65671, -7.961928, 'Marrakech', 'Angle Rue Moulay Youssef et Rue Oqba Ibn Nafii, Marrakech', 'طو رقم 18 نك 105+455 جماعة Tameslouht، إقليم Marrakech-Safi'),
+        ('1365', 'DERB SULTAN', 'محطة درب السلطان', 34.252099, -6.557303, 'Kénitra', 'CT 4673 PK 63+229 Douar Oulad Ziane, Province Marrakech-Safi', 'شارع Bir Anzarane كم 10، Kénitra'),
+        ('2374', 'ENNASR', 'محطة النصر', 33.040305, -7.652724, 'Settat', 'CT 5844 PK 141+243 Douar Oulad Brahim, Province Rabat-Salé', 'طو رقم 17 نك 202+479 جماعة Ain Atiq، إقليم Casablanca'),
+        ('2860', 'FADL', 'محطة الفضل', 33.860471, -6.086341, 'Khémisset', 'Zone Industrielle Ahl Loghlam, Lot 159, Khémisset', 'بوليفارد Zerktouni، حي Hay Salam، Khémisset'),
+        ('2858', 'GHANDI', 'محطة غاندي', 33.604393, -7.625023, 'Casablanca', 'Boulevard Ghandi, Quartier Hay Hassani, Casablanca', 'طو 8284 نك 197+714 مركز Ouled Moussa'),
+        ('8900', 'HILAL', 'محطة الهلال', 34.235242, -3.976591, 'Taza', 'Avenue Allal Ben Abdellah KM 12, Taza', 'طث 9698 نك 114+311 دوار Ait Lahcen، إقليم Rabat-Salé'),
+        ('6856', 'INBIAAT', 'محطة الانبعاث', 35.603941, -5.343682, 'Tétouan', 'Boulevard Zerktouni, Quartier Hay Salam, Tétouan', 'طث 2653 نك 79+858 دوار Ait Lahcen، إقليم Rabat-Salé')
+    ]
+    
+    cursor.executemany("""
+        INSERT INTO data_stations (code_station, nom_station_fr, nom_station_ar, latitude, longitude, ville, address_fr, address_ar)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, stations_data)
+    conn.commit()
+    print(f"  ✅ data_stations: {len(stations_data)} enregistrements insérés")
+    
+    # =========================================
+    # 3. INSERTION DES DONNÉES - PRIX
+    # =========================================
+    
+    # Extraire les prix depuis le fichier SQL
+    prix_file = "02_station_produit_prix_rel.sql"
+    prix_file_path = os.path.join(os.path.dirname(DB_PATH), prix_file)
+    
+    if not os.path.exists(prix_file_path):
+        prix_file_path = prix_file
+    
+    prix_data = []
+    
+    if os.path.exists(prix_file_path):
+        with open(prix_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Pattern pour extraire les INSERT
+        pattern = r"VALUES\s*\(\s*'([^']+)'\s*,\s*(\d+)\s*,\s*([\d.]+)\s*,\s*'([^']+)'\s*,\s*'([^']*)'\s*,\s*([^)]+)\)"
+        matches = re.findall(pattern, content)
+        
+        for match in matches:
+            code_station = match[0]
+            code_produit = match[1]
+            prix = float(match[2])
+            unite = match[3]
+            date_du = match[4] if match[4] != 'NULL' else None
+            date_au = match[5].strip().replace("'", "").replace(" ", "")
+            if date_au == 'NULL' or date_au == '':
+                date_au = None
+            
+            prix_data.append((code_station, code_produit, prix, unite, date_du, date_au))
+        
+        cursor.executemany("""
+            INSERT INTO station_produit_prix_rel (code_station, code_produit, prix, unite, date_du, date_au)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, prix_data)
+        conn.commit()
+        print(f"  ✅ station_produit_prix_rel: {len(prix_data)} enregistrements insérés")
+    else:
+        print(f"  ⚠️ Fichier {prix_file} non trouvé")
+    
+    # =========================================
+    # 4. INSERTION DES DONNÉES - POINTS DE VENTE
+    # =========================================
+    
+    pdvs_file = "03_data_pdvs_lubrifiant.sql"
+    pdvs_file_path = os.path.join(os.path.dirname(DB_PATH), pdvs_file)
+    
+    if not os.path.exists(pdvs_file_path):
+        pdvs_file_path = pdvs_file
+    
+    pdvs_data = []
+    
+    if os.path.exists(pdvs_file_path):
+        with open(pdvs_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Pattern pour extraire les INSERT
+        pattern = r"VALUES\s*\(\s*'([^']+)'\s*,\s*([^,]+)\s*,\s*'([^']*)'\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\)"
+        matches = re.findall(pattern, content)
+        
+        for match in matches:
+            nom_fr = match[0]
+            nom_ar = match[1] if match[1] != 'NULL' else None
+            telephone = match[2] if match[2] else None
+            latitude = float(match[3]) if match[3] else None
+            longitude = float(match[4]) if match[4] else None
+            
+            pdvs_data.append((nom_fr, nom_ar, telephone, latitude, longitude))
+        
+        cursor.executemany("""
+            INSERT INTO data_pdvs_lubrifiant (nom_fr, nom_ar, telephone, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?)
+        """, pdvs_data)
+        conn.commit()
+        print(f"  ✅ data_pdvs_lubrifiant: {len(pdvs_data)} enregistrements insérés")
+    else:
+        print(f"  ⚠️ Fichier {pdvs_file} non trouvé")
+    
+    # =========================================
+    # 5. VÉRIFICATION FINALE
+    # =========================================
+    print("\n--- Étape 3: Vérification ---")
+    
+    tables = ["data_stations", "station_produit_prix_rel", "data_pdvs_lubrifiant"]
+    for table in tables:
+        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+        count = cursor.fetchone()[0]
+        print(f"  📊 {table}: {count} enregistrements")
+    
+    # Afficher quelques exemples
+    print("\n--- Exemples de données ---")
+    
+    cursor.execute("SELECT code_station, nom_station_fr, ville FROM data_stations LIMIT 5")
+    stations = cursor.fetchall()
+    print("\n📌 Stations (5 premiers):")
+    for s in stations:
+        print(f"    - {s[0]}: {s[1]} ({s[2]})")
+    
+    cursor.execute("SELECT code_station, code_produit, prix FROM station_produit_prix_rel LIMIT 5")
+    prix = cursor.fetchall()
+    if prix:
+        print("\n💰 Prix (5 premiers):")
+        for p in prix:
+            print(f"    - Station {p[0]}, produit {p[1]}: {p[2]} MAD/L")
+    
+    cursor.execute("SELECT nom_fr, telephone FROM data_pdvs_lubrifiant LIMIT 5")
+    pdvs = cursor.fetchall()
+    if pdvs:
+        print("\n🏪 Points de vente (5 premiers):")
+        for p in pdvs:
+            print(f"    - {p[0]}: {p[1]}")
+    
+    # Vérifier les jointures
+    print("\n--- Vérification des jointures ---")
+    
+    cursor.execute("""
+        SELECT s.nom_station_fr, COUNT(p.id) as nb_prix
+        FROM data_stations s
+        LEFT JOIN station_produit_prix_rel p ON s.code_station = p.code_station
+        GROUP BY s.nom_station_fr
+        ORDER BY s.nom_station_fr
+        LIMIT 10
+    """)
+    
+    jointures = cursor.fetchall()
+    if jointures:
+        print("\n🔗 Stations avec leurs prix:")
+        for j in jointures:
+            print(f"    - {j[0]}: {j[1]} prix")
+    
+    # Fermer la connexion
+    conn.close()
+    
+    print("\n" + "=" * 60)
+    print(f"  ✅ BASE DE DONNÉES CRÉÉE AVEC SUCCÈS !")
+    print(f"  📁 Fichier: {DB_PATH}")
+    print("=" * 60)
+    
+    return DB_PATH
 
-statuts_appro = ["livré","livré","livré","livré","commandé","partiel","annulé"]
 
-for i in range(1, 301):
-    s_id = random.randint(1, 12)
-    carbs = list(carbs_par_station.get(s_id, [1,2]))
-    c_id = random.choice(carbs)
-    carb = CARBURANTS_DATA[c_id-1]
-    fourn = random.choice(FOURNISSEURS_DATA)
-    vol_cmd = random.choice([5000, 10000, 15000, 20000, 30000])
-    statut = random.choice(statuts_appro)
-    vol_livre = vol_cmd if statut=="livré" else (
-        round(vol_cmd * random.uniform(0.5,0.9),0) if statut=="partiel" else 0)
-    prix_u = carb[3] * random.uniform(0.97, 1.02)
-    montant = round(vol_livre * prix_u, 2)
-    date_cmd = rand_date(365)
-    delai = timedelta(hours=fourn[4])
-    date_prev = date_cmd + delai
-    date_reel = (date_prev + timedelta(hours=random.randint(-4,8))) if statut in ("livré","partiel") else None
-    cur.execute("""INSERT INTO approvisionnements
-        (numero,station_id,carburant_id,fournisseur_id,volume_commande_L,volume_livre_L,
-         prix_unitaire,montant_total,statut,date_commande,date_livraison_prevue,date_livraison_reelle)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""", (
-        f"APPRO-{i:04d}", s_id, c_id, fourn[0],
-        vol_cmd, vol_livre, round(prix_u,2), montant, statut,
-        date_cmd.strftime("%Y-%m-%d %H:%M"),
-        date_prev.strftime("%Y-%m-%d %H:%M"),
-        date_reel.strftime("%Y-%m-%d %H:%M") if date_reel else None
-    ))
+# =============================================
+# EXÉCUTION
+# =============================================
 
-# ═══════════════════════════════════════════════════
-# VENTES JOURNALIÈRES (90 jours × 12 stations × carburants)
-# ═══════════════════════════════════════════════════
-VENTE_BASE = {1:3000, 2:1500, 3:800, 4:500, 5:2000, 6:400}
-
-for day_offset in range(90):
-    date_v = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
-    for s_id, carb_list in carbs_par_station.items():
-        if s_id == 12: continue  # fermée
-        for c_id in carb_list:
-            base = VENTE_BASE.get(c_id, 1000)
-            # stations grandes vendent plus
-            mult = 1.5 if s_id in [1,3,8] else (0.6 if s_id in [11,4] else 1.0)
-            # week-end -20%
-            dow = (datetime.now() - timedelta(days=day_offset)).weekday()
-            if dow >= 5: mult *= 0.8
-            vol = round(base * mult * random.uniform(0.85, 1.15), 0)
-            prix = CARBURANTS_DATA[c_id-1][4]
-            montant = round(vol * prix, 2)
-            nb_tx = random.randint(30, 200)
-            cur.execute("INSERT INTO ventes_journalieres VALUES (NULL,?,?,?,?,?,?)",
-                        (s_id, c_id, date_v, vol, montant, nb_tx))
-
-# ═══════════════════════════════════════════════════
-# MAINTENANCES
-# ═══════════════════════════════════════════════════
-types_maint = ["nettoyage","inspection","réparation","calibration"]
-techniciens = ["Ali Benchekroun","Mustapha Lahlou","Hamid Ouaziz","Yassine Bakkali"]
-
-for i in range(60):
-    s_id = random.randint(1, 12)
-    cuves_s = [cv for (sid,cid),cvs in cuve_map.items() if sid==s_id for cv in cvs]
-    if not cuves_s: continue
-    cv_id = random.choice(cuves_s)[0]
-    type_m = random.choice(types_maint)
-    statut_m = random.choice(["planifiée","en_cours","terminée","terminée","terminée"])
-    date_plan = rand_date(180)
-    date_deb = date_plan + timedelta(hours=1) if statut_m != "planifiée" else None
-    date_fin = (date_deb + timedelta(hours=random.randint(2,24))) if statut_m == "terminée" else None
-    cout = round(random.uniform(500, 8000), 2)
-    cur.execute("""INSERT INTO maintenances
-        (station_id,cuve_id,type_maintenance,description,statut,
-         date_planifiee,date_debut,date_fin,cout_MAD,technicien) VALUES (?,?,?,?,?,?,?,?,?,?)""", (
-        s_id, cv_id, type_m,
-        f"{type_m.capitalize()} programmé{'e' if type_m[-1]=='n' else ''} — cuve {cv_id}",
-        statut_m,
-        date_plan.strftime("%Y-%m-%d %H:%M"),
-        date_deb.strftime("%Y-%m-%d %H:%M") if date_deb else None,
-        date_fin.strftime("%Y-%m-%d %H:%M") if date_fin else None,
-        cout, random.choice(techniciens)
-    ))
-
-# ═══════════════════════════════════════════════════
-# HISTORIQUE PRIX (12 mois)
-# ═══════════════════════════════════════════════════
-for c_id in range(1,7):
-    for m in range(12, 0, -1):
-        date_app = (datetime.now() - timedelta(days=m*30)).strftime("%Y-%m-%d")
-        base_achat = CARBURANTS_DATA[c_id-1][3]
-        base_vente = CARBURANTS_DATA[c_id-1][4]
-        variation = random.uniform(-0.3, 0.3)
-        cur.execute("INSERT INTO prix_historique VALUES (NULL,?,?,?,?)",
-                    (c_id, round(base_achat+variation,2), round(base_vente+variation*1.2,2), date_app))
-
-con.commit()
-
-# ═══════════════════════════════════════════════════
-# RÉSUMÉ
-# ═══════════════════════════════════════════════════
-print("=" * 55)
-print("  BASE SQLITE ALLOCARBURANT — STATIONS & STOCKS")
-print("=" * 55)
-tables = ["stations","carburants","cuves","stocks","fournisseurs",
-          "approvisionnements","ventes_journalieres","alertes_stock",
-          "maintenances","prix_historique"]
-total = 0
-for t in tables:
-    n = cur.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-    total += n
-    print(f"  {t:<25} {n:>5} enregistrements")
-print(f"  {'─'*40}")
-print(f"  {'TOTAL':<25} {total:>5} enregistrements")
-print("=" * 55)
-
-# Alertes actives
-al = cur.execute("SELECT COUNT(*) FROM alertes_stock WHERE statut='active'").fetchone()[0]
-print(f"  Alertes stock actives   : {al}")
-
-# CA ventes 30 derniers jours
-ca = cur.execute("""
-    SELECT SUM(montant_MAD) FROM ventes_journalieres
-    WHERE date_vente >= date('now','-30 days')
-""").fetchone()[0]
-print(f"  CA ventes (30 jours)    : {ca:,.0f} MAD")
-
-con.close()
-print(f"\n  Fichier : {DB_PATH}")
-print("  → Base prête. Utilisez la connection string dans votre dashboard.")
+if __name__ == "__main__":
+    create_database()

@@ -7,6 +7,8 @@ from pydantic import BaseModel, validator
 from contextlib import asynccontextmanager
 
 from app.graph import run
+from langdetect import detect, DetectorFactory
+import re
 from app.utils.logger import setup_logging, get_logger
 
 setup_logging()
@@ -17,33 +19,35 @@ log = get_logger(__name__)
 # DÉTECTION AUTOMATIQUE DE LANGUE
 # ══════════════════════════════════════════════════════════════════════════════
 
+DetectorFactory.seed = 0
+
 def detect_language(text: str) -> str:
     """
-    Détecte la langue de la question depuis le texte brut.
-    Priorité : arabe > anglais > français (défaut).
-
-    - Arabe  : présence d'un caractère dans le bloc Unicode arabe (U+0600–U+06FF)
-    - Anglais: présence d'au moins 1 mot-clé anglais courant
-    - Français: défaut si rien ne matche
+    Détecte la langue de la question.
+    Priorité: arabe (détection manuelle) > langdetect > fallback fr
     """
-    # ── Arabe ─────────────────────────────────────────────────────────────────
+    # Arabe : détection manuelle (plus fiable que langdetect pour l'arabe)
     if re.search(r'[\u0600-\u06FF]', text):
         return "ar"
-
-    # ── Anglais ───────────────────────────────────────────────────────────────
-    english_markers = {
-        "what", "where", "when", "how", "which", "who", "why",
-        "is", "are", "was", "were", "the", "a", "an",
-        "nearest", "closest", "station", "show", "find",
-        "weather", "price", "give", "tell", "me", "my",
-        "can", "could", "please", "want", "need", "get",
-    }
-    words = set(re.findall(r"[a-zA-Z]+", text.lower()))
-    if words & english_markers:
-        return "en"
-
-    # ── Français (défaut) ─────────────────────────────────────────────────────
-    return "fr"
+    
+    try:
+        lang = detect(text)
+        
+        # Normaliser les codes de langue
+        if lang.startswith('fr'):
+            return "fr"
+        elif lang.startswith('en'):
+            return "en"
+        elif lang.startswith('ar'):
+            return "ar"
+        else:
+            # Langue non supportée, fallback français
+            return "fr"
+            
+    except Exception as e:
+        # En cas d'erreur (texte trop court, etc.)
+        print(f"Lang detection error: {e}")
+        return "fr"
 
 
 def resolve_language(requested: str, question: str) -> str:
@@ -120,6 +124,8 @@ class QueryResponse(BaseModel):
     routing_method:         str
     trace_id:               str
     language_used:          str     # ← utile pour debug front-end
+    session_id:             str | None
+    
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -131,21 +137,23 @@ async def query_endpoint(
     req: QueryRequest,
     debug: bool = Query(False),
 ):
+    session_id = req.session_id or str(uuid.uuid4())
     # Résolution finale de la langue (détection auto si front-end envoie "fr" par défaut)
     language = resolve_language(req.language, req.question)
-
+  
     log.info(
         "Requête reçue",
         question=req.question[:60],
         language_requested=req.language,
         language_resolved=language,
         has_geo=bool(req.lat and req.lng),
+        session_id=session_id,
     )
 
     result = await run(
         question   = req.question,
         chatbot_id = req.chatbot_id,
-        session_id = req.session_id,
+        session_id = session_id,
         geo        = {"lat": req.lat, "lng": req.lng} if req.lat and req.lng else None,
         language   = language,
     )
@@ -163,6 +171,7 @@ async def query_endpoint(
         routing_method         = result.get("routing_method", ""),
         trace_id               = result.get("trace_id", ""),
         language_used          = language,
+        session_id             = session_id,
     )
 
 

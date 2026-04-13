@@ -22,7 +22,10 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
       LOG_LEVEL:       "INFO"
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # accès à la BDD sur la machine hôte
+      - "host.docker.internal:host-gateway"  
+    volumes:
+      # AJOUTER CETTE LIGNE - Monte le dossier database contenant carburant.db
+      - ./database:/app/database # accès à la BDD sur la machine hôte
     networks:
       - akwa_net              # ← réseau partagé, visible par l'orchestrateur
     healthcheck:

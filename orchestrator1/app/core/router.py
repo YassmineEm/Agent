@@ -14,9 +14,11 @@ ROUTING_TOOLS = [
         "function": {
             "name": "route_sql",
             "description": (
-                "Utilise pour données structurées AKWA : prix carburants, "
-                "commandes, stocks, vols, aircraft, livraisons, factures, "
-                "rapports chiffrés, historique achats."
+                "Utilise pour les données structurées des stations-service et produits.\n\n"
+                "Pour AlloCarburant : stations, prix carburants (gasoil, essence), codes produits, "
+                "points de vente lubrifiants, coordonnées GPS.\n\n"
+                "Pour AlloGaz : stations GPL, prix du butane/propane, bouteilles de gaz, "
+                "points de vente de gaz, livraisons à domicile."
             ),
             "parameters": {"type": "object", "properties": {
                 "confidence": {"type": "number"},
@@ -29,9 +31,11 @@ ROUTING_TOOLS = [
         "function": {
             "name": "route_rag",
             "description": (
-                "Utilise pour documentation technique AKWA : normes EN590/EN228, "
-                "fiches carburant, propriétés chimiques, sécurité du carburant, "
-                "risques, dangers, FAQ, fuel recommandé pour véhicules ou aircraft."
+                "Utilise pour la documentation technique et produits.\n\n"
+                "Pour AlloCarburant : caractéristiques des huiles (Qualix, Mega, Havoline, Delo), "
+                "viscosité, spécifications API/ACEA, prix des lubrifiants.\n\n"
+                "Pour AlloGaz : sécurité gaz, consignes d'utilisation, stockage bouteilles, "
+                "normes de sécurité, précautions d'emploi."
             ),
             "parameters": {"type": "object", "properties": {
                 "confidence": {"type": "number"},
@@ -44,12 +48,13 @@ ROUTING_TOOLS = [
         "function": {
             "name": "route_location",
             "description": (
-                "Utilise pour géolocalisation AKWA : station la plus proche, "
-                "carte des stations, distances, itinéraire. "
-                "IMPORTANT : ce cas nécessite TOUJOURS route_multi avec strategy=sequential "
-                "car les stations doivent d'abord être récupérées via sql, "
-                "puis le résultat est passé au location agent."
-        ),
+                "Utilise pour la géolocalisation.\n\n"
+                "Pour AlloCarburant : station la plus proche, calcul de distance, itinéraire.\n\n"
+                "Pour AlloGaz : point de vente GPL le plus proche, dépôt de gaz, "
+                "distance du client.\n\n"
+                "IMPORTANT : nécessite TOUJOURS route_multi avec strategy=sequential "
+                "car les données doivent d'abord être récupérées via sql."
+            ),
             "parameters": {"type": "object", "properties": {
                 "confidence": {"type": "number"},
                 "reason":     {"type": "string"}
@@ -59,11 +64,11 @@ ROUTING_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "route_weather",                        
+            "name": "route_weather",
             "description": (
-                "Utilise pour toute question météorologique : "
-                "température, pluie, vent, prévisions météo, "
-                "conditions actuelles ou futures pour une ville ou région."
+                "Utilise uniquement pour les questions météorologiques : "
+                "température, pluie, vent, prévisions. "
+                "Non prioritaire pour AlloCarburant et AlloGaz."
             ),
             "parameters": {"type": "object", "properties": {
                 "confidence": {"type": "number"},
@@ -76,12 +81,17 @@ ROUTING_TOOLS = [
         "function": {
             "name": "route_multi",
             "description": (
-                "Utilise quand la question nécessite PLUSIEURS agents. "
-                "Détermine si les agents sont PARALLEL (indépendants, appel simultané) "
-                "ou SEQUENTIAL (l'un dépend du résultat de l'autre).\n"
-                "PARALLEL : 'sécuriser gaz ET nb vols' → rag + sql simultanés.\n"
-                "SEQUENTIAL : 'top 3 aircraft puis leur fuel' → sql d'abord, "
-                "résultat injecté dans rag ensuite."
+                "Utilise quand la question nécessite PLUSIEURS agents.\n\n"
+                "EXEMPLES POUR ALLOCARBURANT :\n"
+                "- SEQUENTIAL : 'Quelle est la station la plus proche et son prix ?' "
+                "→ sql (stations) → location (plus proche) → sql (prix)\n"
+                "- PARALLEL : 'Liste stations à Casablanca et prix du gasoil' → sql + sql\n\n"
+                "EXEMPLES POUR ALLOGAZ :\n"
+                "- SEQUENTIAL : 'Où acheter du gaz près de chez moi ?' → sql (points vente) → location\n"
+                "- SEQUENTIAL : 'Prix du gaz et sécurité' → sql (prix) → rag (sécurité)\n\n"
+                "RÈGLES :\n"
+                "- PARALLEL : agents indépendants (ex: stations ET prix)\n"
+                "- SEQUENTIAL : résultat du 1er nécessaire au 2ème (ex: trouver point vente → distance)"
             ),
             "parameters": {
                 "type": "object",
@@ -98,8 +108,8 @@ ROUTING_TOOLS = [
                         "type": "string",
                         "enum": ["parallel", "sequential"],
                         "description": (
-                            "parallel: agents indépendants. "
-                            "sequential: le résultat du 1er agent alimente le 2ème."
+                            "parallel: agents indépendants (appel simultané). "
+                            "sequential: l'ordre d'exécution est important."
                         )
                     },
                     "confidence": {"type": "number"},
@@ -113,7 +123,14 @@ ROUTING_TOOLS = [
         "type": "function",
         "function": {
             "name": "route_direct",
-            "description": "Utilise pour les conversations générales, salutations, remerciements, présentations, ou toute question ne nécessitant AUCUN accès à une base de données, documentation, localisation ou météo. Le LLM répondra directement.",
+            "description": (
+                "Utilise pour les conversations générales : "
+                "salutations, remerciements, présentations, "
+                "questions sur l'assistant, ou toute question ne nécessitant "
+                "⚠️ Si la question contient des mots comme : carburant, diesel, essence, GPL, "
+                "station, prix, lubrifiant, huile, compatible, norme, sécurité → "
+                "N'UTILISE JAMAIS route_direct. Utilise route_rag ou route_sql à la place."
+            ),
             "parameters": {"type": "object", "properties": {
                 "confidence": {"type": "number"},
                 "reason": {"type": "string"}
@@ -136,6 +153,7 @@ async def route(
     question:   str,
     session_id: str | None = None,
     tried:      list[str]  = None,
+    session_summary: str | None = None,
 ) -> tuple[list[str], float, str, str]:
     """
     Retourne (agents_to_call, confidence, method, strategy).
@@ -153,6 +171,18 @@ async def route(
     context = ""
     if tried:
         context = f"\n(Agents déjà tentés : {tried})"
+
+    # ← NOUVEAU : injecter le contexte de session
+    memory_context = ""
+    if session_summary:
+        memory_context = f"""
+CONTEXTE DE LA CONVERSATION EN COURS :
+{session_summary}
+
+Si la question contient des références comme "cette station", "ce produit", 
+"son prix", "celle-là" — résous la référence depuis le contexte ci-dessus 
+avant de router.
+"""
 
     messages = [
         {

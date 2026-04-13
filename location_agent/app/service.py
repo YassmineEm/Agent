@@ -14,9 +14,9 @@ _MESSAGES = {
         "ar": "تعذّر تحديد موقعك. يرجى تفعيل خدمة تحديد الموقع أو تحديد عنوان.",
     },
     "empty": {
-        "fr": "Aucune station AKWA n'a été transmise. Vérifiez que l'agent SQL a bien retourné des stations.",
-        "en": "No AKWA station was provided. Please check that the SQL agent returned stations correctly.",
-        "ar": "لم يتم تمرير أي محطة AKWA. يرجى التحقق من أن وكيل SQL قد أعاد المحطات بشكل صحيح.",
+        "fr": "Aucune station n'a été transmise. Vérifiez que l'agent SQL a bien retourné des stations.",
+        "en": "No station was provided. Please check that the SQL agent returned stations correctly.",
+        "ar": "لم يتم تمرير أي محطة . يرجى التحقق من أن وكيل SQL قد أعاد المحطات بشكل صحيح.",
     },
     "too_far": {
         "fr": "La station la plus proche est '{name}' mais elle se trouve à {dist} km — trop éloignée de votre position ({lat}, {lng}).",
@@ -24,9 +24,9 @@ _MESSAGES = {
         "ar": "أقرب محطة هي '{name}' لكنها تبعد {dist} كم — بعيدة جداً عن موقعك ({lat}, {lng}).",
     },
     "ok": {
-        "fr": "La station AKWA la plus proche est '{name}'{address_part}, à {dist} km de votre position{fuel_part}. {total} station(s) disponible(s) au total.",
-        "en": "The nearest AKWA station is '{name}'{address_part}, {dist} km from your position{fuel_part}. {total} station(s) available in total.",
-        "ar": "أقرب محطة AKWA هي '{name}'{address_part}، على بُعد {dist} كم من موقعك{fuel_part}. إجمالي المحطات المتاحة: {total}.",
+        "fr": "La station la plus proche est '{name}'{address_part}, à {dist} km de votre position{fuel_part}. {total} station(s) disponible(s) au total.",
+        "en": "The nearest station is '{name}'{address_part}, {dist} km from your position{fuel_part}. {total} station(s) available in total.",
+        "ar": "أقرب محطة هي '{name}'{address_part}، على بُعد {dist} كم من موقعك{fuel_part}. إجمالي المحطات المتاحة: {total}.",
     },
 }
 

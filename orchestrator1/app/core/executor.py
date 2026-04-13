@@ -61,12 +61,28 @@ def _parse_stations_from_sql(answer) -> list:
 
 
 # Champs possibles pour chaque attribut Station attendu par location_agent
-_NAME_ALIASES = ["name", "nom", "station_name", "station", "libelle", "label", "title"]
-_LAT_ALIASES  = ["lat", "latitude", "lat_gps", "geo_lat", "y"]
-_LNG_ALIASES  = ["lng", "lon", "longitude", "lng_gps", "geo_lng", "long", "x"]
-_ADDR_ALIASES = ["address", "adresse", "addr", "ville", "city", "location"]
-_FUEL_ALIASES = ["fuel_type", "carburant", "type_carburant", "fuel", "product"]
+_NAME_ALIASES = [
+    "name", "nom", "station_name", "station", "libelle", "label", "title",
+    "nom_station_fr", "nom_station", "station_fr", "nom_fr"
+]
 
+_LAT_ALIASES = [
+    "lat", "latitude", "lat_gps", "geo_lat", "y"
+]
+
+_LNG_ALIASES = [
+    "lng", "lon", "longitude", "lng_gps", "geo_lng", "long", "x"
+]
+
+_ADDR_ALIASES = [
+    "address", "adresse", "addr", "city", "location",
+    "ville", "address_fr", "address_ar"
+]
+
+_FUEL_ALIASES = [
+    "fuel_type", "carburant", "type_carburant", "fuel", "product",
+    "type", "produit", "code_produit", "prix", "price"
+]
 
 def _normalize_station_row(row: dict) -> dict | None:
     """

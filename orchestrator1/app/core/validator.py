@@ -47,7 +47,7 @@ def _quick_check(answers: list[dict]) -> tuple[str, str]:
     return "UNCERTAIN", f"low_avg_{avg:.2f}"
 
 
-async def validate(question: str, answers: list[dict], language: str = "fr",session_summary: str | None = None,recent_turns:    list[dict] = None,) -> tuple[str, str, str]:
+async def validate(question: str, answers: list[dict], language: str = "fr", session_summary: str | None = None, recent_turns: list[dict] = None) -> tuple[str, str, str]:
     """
     Valide et synthétise les réponses des agents.
     Retourne (status, reason, final_answer).
@@ -67,25 +67,29 @@ async def validate(question: str, answers: list[dict], language: str = "fr",sess
         agent_name   = successful[0]["agent"]
         log.info("Validation PASS direct", agent=agent_name)
 
-        if language == "fr":
-            return "PASS", reason, agent_answer
-
+        # Force le passage par LLM pour traduire les codes produits
         try:
-            synthesis = await generate(
+            translated = await generate(
                 LLM_VALIDATOR,
-                f"""Translate or rewrite the following answer in "{language}".
-Do NOT add information. Do NOT summarize. Just rewrite in {language}.
+                f"""Réécris la réponse suivante en remplaçant TOUS les codes produits par leurs noms.
 
-Original answer:
+Règles de traduction OBLIGATOIRES :
+- 11011001 → Gazole B7
+- 11052001 → SP95
+- 11054001 → SP98
+- 11191001 → E10
+- 15011001 → GPL
+
+Réponse originale :
 {agent_answer}
 
-Rewritten answer in {language}:""",
-            timeout=45,
-        )
-            log.info("Reformulation langue réussie", agent=agent_name, language=language)
-            return "PASS", reason, synthesis
+Réponse corrigée (uniquement avec les noms, jamais les codes) :""",
+                timeout=30,
+            )
+            log.info("Traduction codes produits réussie", agent=agent_name)
+            return "PASS", reason, translated
         except Exception as e:
-            log.warning("Reformulation échouée — retour brut", error=str(e))
+            log.warning("Traduction codes échouée, réponse brute", error=str(e))
             return "PASS", reason, agent_answer
 
     # ── Multi-agent : identifier les agents forts ─────────────────────────────
@@ -128,12 +132,21 @@ Rewritten answer in {language}:""",
 """
 
     # ── Synthèse directe si au moins 1 agent fort OU status PASS ─────────────
-    # On bypasse complètement l'évaluation booléenne — on synthétise directement
     if strong or status == "PASS":
         try:
             synthesis = await generate(
                 LLM_VALIDATOR,
                 f"""IMPORTANT: You MUST respond in this language: "{language}"
+
+## RÈGLES IMPORTANTES POUR LES PRODUITS :
+- Ne JAMAIS afficher les codes produits (ex: 11011001)
+- Utilise TOUJOURS les noms des produits :
+  * 11011001 → Gazole B7
+  * 11052001 → SP95
+  * 11054001 → SP98
+  * 11191001 → E10
+  * 15011001 → GPL
+
 {memory_block}
 You are an AKWA assistant (Morocco fuel company).
 Currency is always Moroccan Dirham (DH or MAD), never euros or dollars.
@@ -150,6 +163,7 @@ INSTRUCTIONS:
 - Combine all information to answer the question directly.
 - Do NOT mention "agents" or "sources".
 - Your response language MUST be: {language}
+- NEVER show product codes, only product names.
 
 Answer:""",
                 timeout=90,
@@ -176,14 +190,38 @@ Answer:""",
             synthesis = await generate(
                 LLM_VALIDATOR,
                 f"""IMPORTANT: You MUST respond in this language: "{language}"
+
+## RÈGLES STRICTES POUR ALLOCARBURANT
+
+1. **Pour lister les stations par ville** : Donne les NOMS COMPLETS des stations.
+   Exemple: "Les stations à Casablanca sont RAHMA et GHANDI."
+
+2. **Pour le nombre de stations** : Indique le nombre ET liste les noms.
+   Exemple: "Il y a 4 stations à Agadir : BAB DOUKKALA, HAY MOHAMMADI, RIAD, YASMINE."
+
+3. **Pour les produits** : Utilise les NOMS, jamais les codes.
+   - 11011001 → Gazole B7
+   - 11052001 → SP95
+   - 11054001 → SP98
+   - 11191001 → E10
+   - 15011001 → GPL
+
+4. **Pour les prix** : Utilise le format "X.XX MAD/L"
+   Exemple: "Le prix du gazole à la station AL AMAL est de 11.01 MAD/L."
+
+5. **Pour la station la plus proche** : Donne le nom ET la distance.
+   Exemple: "La station la plus proche est RAHMA à 6.29 km."
+
 {memory_block}
+           
 Question: {question}
 
 Informations partielles disponibles:
 {formatted}
 
 Synthétise ces informations même si incomplètes. Indique ce qui est disponible et ce qui manque si nécessaire.
-Réponds dans la langue: {language}""",
+Réponds dans la langue: {language}
+N'utilise JAMAIS de codes produits (11011001, 11052001, etc.). Utilise toujours les noms comme indiqué ci-dessus.""",
                 timeout=60,
             )
             log.info("Synthèse UNCERTAIN réussie", answer_length=len(synthesis))

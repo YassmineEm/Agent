@@ -67,6 +67,8 @@ RÈGLES STRICTES :
   * Ville / région de l'utilisateur
   * Type de véhicule ou carburant préféré
   * Requêtes récurrentes ou préférences détectées
+  * Dernière station mentionnée : format EXACT → "Dernière station : NOM_EN_MAJUSCULES"  ← AJOUTER
+  * Dernière distance mentionnée si pertinente
 - N'inclus JAMAIS : prix, températures, données volatiles, formules de politesse
 - Si rien de nouveau n'est utile, retourne le résumé existant tel quel
 - S'il n'y a aucun contexte antérieur et rien à retenir, retourne une chaîne vide

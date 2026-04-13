@@ -6,7 +6,7 @@ Supporte FR / EN / AR nativement.
 import httpx
 import os
 
-OLLAMA_URL   = os.getenv("OLLAMA_URL",   "https://displayed-pin-least-preview.trycloudflare.com")
+OLLAMA_URL   = os.getenv("OLLAMA_URL",   "https://soul-extremely-rubber-civic.trycloudflare.com")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 
 
