@@ -37,7 +37,7 @@ app = FastAPI(
 class WeatherRequest(BaseModel):
     question:   str
     session_id: Optional[str] = None
-    language:   Optional[str] = "fr"    # ← "fr" | "en" | "ar"
+    language:   Optional[str] = "fr"
     chatbot_id: Optional[str] = ""
 
 
@@ -58,7 +58,7 @@ async def weather_query(req: WeatherRequest):
 
     try:
         # ── 1. Détecter l'intention et la durée
-        parsed = parse_intent(req.question)
+        parsed = await parse_intent(req.question)  # ✅ CORRECTION
         intent = parsed["intent"]
         days   = parsed["days"]
 
@@ -71,13 +71,10 @@ async def weather_query(req: WeatherRequest):
         # ── 3. Vérifier le cache Redis
         cached = await cache.get(lat, lng, intent, days)
         if cached:
-            # Si le cache existe mais dans une autre langue → régénérer la réponse
-            # (les données météo sont les mêmes, seule la réponse textuelle change)
             cached_lang = cached.get("language", "fr")
             if cached_lang == language:
                 return WeatherResponse(**{**cached, "from_cache": True})
             else:
-                # Régénérer la réponse dans la bonne langue avec les données cachées
                 answer = await build_natural_response(
                     weather_data=cached["weather_data"],
                     original_question=req.question,
@@ -95,10 +92,10 @@ async def weather_query(req: WeatherRequest):
                     agents_used=["weather"],
                 )
 
-        # ── 4. Appeler l'API OpenWeatherMap (avec langue pour les descriptions)
+        # ── 4. Appeler l'API OpenWeatherMap
         weather_data = await fetch_weather(lat, lng, intent, days, language=language)
 
-        # ── 5. Générer la réponse naturelle via Ollama dans la bonne langue
+        # ── 5. Générer la réponse naturelle via Ollama
         answer = await build_natural_response(
             weather_data=weather_data,
             original_question=req.question,

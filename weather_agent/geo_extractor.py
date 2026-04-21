@@ -10,10 +10,10 @@ class Location(TypedDict):
     city: str
     lat: float
     lng: float
-    source: str  # "local" | "owm_geocoding" | "default"
+    source: str  
 
 
-# Dictionnaire local — évite un appel API pour les villes marocaines fréquentes
+
 MAROC_CITIES: dict[str, tuple[float, float]] = {
     "casablanca":   (33.5731, -7.5898),
     "rabat":        (34.0209, -6.8416),

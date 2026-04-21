@@ -2,12 +2,14 @@
 summarizer.py — Gestion du résumé conversationnel AKWA.
 
 Principe : après chaque échange, on génère un résumé court (max 4 phrases)
-qui capture les faits utiles pour les échanges futurs. C'est bien plus
-efficace que stocker tout l'historique brut.
+qui capture les faits utiles pour les échanges futurs.
 
 Stockage : Redis via memory.py
   clé : orch:session:{session_id}:summary
   TTL : 1800s (30 min)
+
+FIX: ajout des headers Cloudflare Access (absents dans la version originale
+     → 403 Forbidden systématique sur chaque mise à jour de résumé).
 """
 import os
 import httpx
@@ -17,6 +19,19 @@ log = get_logger(__name__)
 
 OLLAMA_URL    = os.getenv("OLLAMA_URL", "http://ollama:11434")
 SUMMARY_MODEL = os.getenv("LLM_SUPERVISOR", "qwen3:8b")
+
+# FIX: récupérer les credentials Cloudflare Access comme dans ollama_client.py
+CF_ACCESS_CLIENT_ID     = os.getenv("CF_ACCESS_CLIENT_ID", "")
+CF_ACCESS_CLIENT_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "")
+
+
+def _get_headers() -> dict:
+    """Headers pour Cloudflare Access — identique à ollama_client.py."""
+    headers = {"Content-Type": "application/json"}
+    if CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET:
+        headers["CF-Access-Client-Id"]     = CF_ACCESS_CLIENT_ID
+        headers["CF-Access-Client-Secret"] = CF_ACCESS_CLIENT_SECRET
+    return headers
 
 
 async def update_summary(
@@ -67,7 +82,7 @@ RÈGLES STRICTES :
   * Ville / région de l'utilisateur
   * Type de véhicule ou carburant préféré
   * Requêtes récurrentes ou préférences détectées
-  * Dernière station mentionnée : format EXACT → "Dernière station : NOM_EN_MAJUSCULES"  ← AJOUTER
+  * Dernière station mentionnée : format EXACT → "Dernière station : NOM_EN_MAJUSCULES"
   * Dernière distance mentionnée si pertinente
 - N'inclus JAMAIS : prix, températures, données volatiles, formules de politesse
 - Si rien de nouveau n'est utile, retourne le résumé existant tel quel
@@ -88,11 +103,11 @@ Résumé mis à jour (en français, max 4 phrases) :"""
                         "num_predict": 150,
                     },
                 },
+                headers=_get_headers(),  # FIX: headers CF ajoutés
             )
         r.raise_for_status()
         summary = r.json().get("response", "").strip()
 
-        # Sanity check — ne pas sauvegarder un résumé trop long
         if len(summary) > 500:
             summary = summary[:500]
 

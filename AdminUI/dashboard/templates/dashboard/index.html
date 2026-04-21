@@ -44,6 +44,16 @@
                     <i class="fas fa-cog mr-1"></i> Actions
                 </span>
                 {% endif %}
+                {% if chatbot.weather_enabled %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-800 shadow-sm">
+                    <i class="fas fa-cloud-sun mr-1"></i> Weather
+                </span>
+                {% endif %}
+                {% if chatbot.location_enabled %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 shadow-sm">
+                    <i class="fas fa-map-marker-alt mr-1"></i> Location
+                </span>
+                {% endif %}
             </div>
 
             <!-- Actions -->

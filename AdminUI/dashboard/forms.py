@@ -10,7 +10,7 @@ class ChatbotForm(forms.ModelForm):
         model = Chatbot
         fields = [
             'name', 'description', 'role', 'scope', 'base_model',
-            'sql_enabled', 'sql_llm', 'rag_enabled', 'action_enabled', 'is_active'
+            'sql_enabled', 'sql_llm', 'rag_enabled', 'action_enabled','weather_enabled', 'location_enabled', 'is_active'
         ]
         widgets = {
             'name': forms.TextInput(attrs={
@@ -50,6 +50,14 @@ class ChatbotForm(forms.ModelForm):
                 'class': 'w-4 h-4 text-blue-600 rounded focus:ring-blue-500',
                 'x-model': 'actionEnabled'
             }),
+            'weather_enabled': forms.CheckboxInput(attrs={
+                'class': 'w-4 h-4 text-teal-600 rounded focus:ring-teal-500',
+                'x-model': 'weatherEnabled'
+            }),
+            'location_enabled': forms.CheckboxInput(attrs={
+                'class': 'w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500',
+                'x-model': 'locationEnabled'
+            }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'w-4 h-4 text-green-600 rounded focus:ring-green-500'
             }),
@@ -57,11 +65,15 @@ class ChatbotForm(forms.ModelForm):
 
 
 class SQLAgentForm(forms.ModelForm):
-    """SQL Agent connection form"""
-
+    """SQL Agent connection form with separated fields"""
+    
     class Meta:
         model = SQLAgent
-        fields = ['name', 'db_name', 'db_type', 'connection_string', 'is_active']
+        fields = [
+            'name', 'db_name', 'db_type', 
+            'host', 'port', 'database', 'username', 'password',
+            'sqlite_path', 'is_active'
+        ]
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
@@ -72,12 +84,34 @@ class SQLAgentForm(forms.ModelForm):
                 'placeholder': 'Database name (e.g., Global Flight Operations)'
             }),
             'db_type': forms.Select(attrs={
-                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'x-model': 'dbType',
+                '@change': 'updateFieldsVisibility()'
             }),
-            'connection_string': forms.TextInput(attrs={
-                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm',
-                'placeholder': 'sqlite:///database/flight.sqlite or postgresql://user:pass@host:5432/dbname',
+            'host': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'localhost or 192.168.1.100'
+            }),
+            'port': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': '5432 for PostgreSQL, 3306 for MySQL'
+            }),
+            'database': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'Database name'
+            }),
+            'username': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'Database username'
+            }),
+            'password': forms.PasswordInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': 'Database password',
                 'type': 'password'
+            }),
+            'sqlite_path': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
+                'placeholder': '/path/to/database.sqlite or database/carburant.db'
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'w-4 h-4 text-blue-600 rounded focus:ring-blue-500'
@@ -87,11 +121,25 @@ class SQLAgentForm(forms.ModelForm):
 
 class RAGAgentForm(forms.ModelForm):
     """RAG Agent configuration form"""
-    
+
     class Meta:
-        model = RAGAgent
-        fields = ['use_reranker', 'use_query_expansion', 'top_k', 'embedding_model']
+        model  = RAGAgent
+        fields = [
+            'agent_description',   # ← NOUVEAU (en premier pour visibilité)
+            'use_reranker', 'use_query_expansion', 'top_k', 'embedding_model',
+        ]
         widgets = {
+            # ── NOUVEAU ────────────────────────────────────────────────────────
+            'agent_description': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm',
+                'rows': 3,
+                'placeholder': (
+                    'Décris les documents indexés dans ce RAG. '
+                    'Ex: Fiches techniques huiles moteur (Qualix, Havoline, Delo), '
+                    'normes API/ACEA, spécifications viscosité et guides d\'utilisation.'
+                )
+            }),
+            # ──────────────────────────────────────────────────────────────────
             'use_reranker': forms.CheckboxInput(attrs={
                 'class': 'w-4 h-4 text-blue-600 rounded focus:ring-blue-500',
                 'x-model': 'rerankerEnabled'
@@ -116,7 +164,7 @@ class DocumentReferenceForm(forms.ModelForm):
     """Document reference form for RAG"""
 
     class Meta:
-        model = DocumentReference
+        model  = DocumentReference
         fields = ['name', 'doc_type', 'file_path', 'url', 'content_type']
         widgets = {
             'name': forms.TextInput(attrs={
@@ -143,10 +191,13 @@ class DocumentReferenceForm(forms.ModelForm):
 
 class ActionAgentForm(forms.ModelForm):
     """Action/Tool definition form"""
-    
+
     class Meta:
-        model = ActionAgent
-        fields = ['name', 'description', 'endpoint', 'method', 'headers', 'payload_template', 'is_active']
+        model  = ActionAgent
+        fields = [
+            'name', 'description', 'endpoint', 'method',
+            'headers', 'payload_template', 'is_active',
+        ]
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
@@ -154,8 +205,12 @@ class ActionAgentForm(forms.ModelForm):
             }),
             'description': forms.Textarea(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
-                'rows': 2,
-                'placeholder': 'What does this action do?'
+                'rows': 3,
+                'placeholder': (
+                    'Décris ce que fait cette action ET quand l\'utiliser. '
+                    'Ex: Envoie un SMS de confirmation. À utiliser quand l\'utilisateur '
+                    'demande un rappel ou une confirmation de commande.'
+                )
             }),
             'endpoint': forms.URLInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500',
@@ -167,7 +222,7 @@ class ActionAgentForm(forms.ModelForm):
             'headers': forms.Textarea(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm',
                 'rows': 3,
-                'placeholder': '{"Authorization": "Bearer token", "Content-Type": "application/json"}'
+                'placeholder': '{"Authorization": "Bearer token"}'
             }),
             'payload_template': forms.Textarea(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm',
@@ -180,26 +235,24 @@ class ActionAgentForm(forms.ModelForm):
         }
 
 
-# Formsets for dynamic row injection
+# ── Formsets ──────────────────────────────────────────────────────────────────
+
 SQLAgentFormSet = inlineformset_factory(
-    Chatbot,
-    SQLAgent,
+    Chatbot, SQLAgent,
     form=SQLAgentForm,
     extra=1,
     can_delete=True
 )
 
 DocumentReferenceFormSet = inlineformset_factory(
-    RAGAgent,
-    DocumentReference,
+    RAGAgent, DocumentReference,
     form=DocumentReferenceForm,
     extra=1,
     can_delete=True
 )
 
 ActionAgentFormSet = inlineformset_factory(
-    Chatbot,
-    ActionAgent,
+    Chatbot, ActionAgent,
     form=ActionAgentForm,
     extra=1,
     can_delete=True

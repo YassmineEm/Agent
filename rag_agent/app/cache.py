@@ -167,6 +167,31 @@ class CacheService:
         except Exception as e:
             log.warning("Rate limit check échoué, requête autorisée", error=str(e))
             return True, max_requests
+        
+    async def delete_chatbot_data(self, chatbot_id: str) -> None:
+        """
+        Supprime toutes les clés Redis liées à un chatbot.
+        """
+        if not self._redis:
+            return
+    
+        try:
+            # Pattern pour trouver toutes les clés du chatbot
+            patterns = [
+                f"rag:response:*{chatbot_id}*",
+                f"session:{chatbot_id}:*",
+                f"stats:rag_queries:{chatbot_id}",
+                f"stats:rag_cache_hits:{chatbot_id}",
+            ]
+        
+            for pattern in patterns:
+                keys = await self._redis.keys(pattern)
+                if keys:
+                    await self._redis.delete(*keys)
+                    log.info("Clés Redis supprimées", chatbot_id=chatbot_id, pattern=pattern, count=len(keys))
+                
+        except Exception as e:
+            log.warning("Erreur suppression données Redis", chatbot_id=chatbot_id, error=str(e))
 
 
 # Singleton

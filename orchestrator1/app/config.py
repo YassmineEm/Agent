@@ -2,11 +2,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-OLLAMA_URL     = os.getenv("OLLAMA_URL", "https://soul-extremely-rubber-civic.trycloudflare.com")
+OLLAMA_URL     = os.getenv("OLLAMA_URL", "https://ollama.mydigiapps.com")
 LLM_SUPERVISOR = os.getenv("LLM_SUPERVISOR", "qwen3:8b")
 LLM_VALIDATOR  = os.getenv("LLM_VALIDATOR",  "phi4")
 
-# ← noms de containers Docker, pas localhost
+CF_ACCESS_CLIENT_ID     = os.getenv("CF_ACCESS_CLIENT_ID", "")
+CF_ACCESS_CLIENT_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "")
+
 SQL_AGENT_URL      = os.getenv("SQL_AGENT_URL",      "http://akwa_sql_agent:8006/query")
 RAG_AGENT_URL      = os.getenv("RAG_AGENT_URL",      "http://akwa_rag_agent:8005/query")
 LOCATION_AGENT_URL = os.getenv("LOCATION_AGENT_URL", "http://location_agent:8007/query")

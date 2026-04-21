@@ -5,9 +5,27 @@ Supporte FR / EN / AR nativement.
 """
 import httpx
 import os
+import re
 
-OLLAMA_URL   = os.getenv("OLLAMA_URL",   "https://soul-extremely-rubber-civic.trycloudflare.com")
+OLLAMA_URL   = os.getenv("OLLAMA_URL", "https://ollama.mydigiapps.com")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
+
+CF_ACCESS_CLIENT_ID     = os.getenv("CF_ACCESS_CLIENT_ID", "")
+CF_ACCESS_CLIENT_SECRET = os.getenv("CF_ACCESS_CLIENT_SECRET", "")
+
+
+def _get_headers():
+    return {
+        "Content-Type": "application/json",
+        "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+        "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
+    }
+
+
+def _clean_llm_output(raw: str) -> str:
+    """Supprime les blocs <think>...</think> que qwen3 génère parfois."""
+    cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+    return cleaned.strip()
 
 
 def _format_data_block(weather_data: dict, city: str) -> str:
@@ -44,20 +62,11 @@ async def build_natural_response(
     weather_data:      dict,
     original_question: str,
     city:              str,
-    language:          str = "fr",          # ← NOUVEAU PARAMÈTRE
+    language:          str = "fr",
 ) -> str:
-    """
-    Génère une réponse naturelle via LLM.
-
-    Args:
-        weather_data:      données brutes OWM
-        original_question: question originale de l'utilisateur
-        city:              nom de la ville
-        language:          "fr" | "en" | "ar"
-    """
+    """Génère une réponse naturelle via LLM."""
     data_block = _format_data_block(weather_data, city)
 
-    # Instruction de langue explicite et non ambiguë
     lang_instruction = {
         "fr": "Réponds UNIQUEMENT en français.",
         "en": "Respond ONLY in English.",
@@ -78,6 +87,7 @@ STRICT INSTRUCTIONS:
   extreme heat > 40°C), mention it in one short sentence.
 - Do NOT invent any data — use ONLY the data provided above.
 - Respond DIRECTLY without any introduction phrase ("Sure", "Here is", "Bien sûr", etc.).
+- Do NOT include any <think> block or internal reasoning — just the final answer.
 
 Response:"""
 
@@ -87,25 +97,35 @@ Response:"""
         "stream": False,
         "options": {
             "temperature": 0.1,
-            "num_predict": 250,
+            "num_predict": 500,   # ✅ augmenté pour éviter les coupures
+            "num_ctx": 4096,      # ✅ contexte élargi
         },
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(f"{OLLAMA_URL}/api/generate", json=payload)
+        async with httpx.AsyncClient(timeout=60.0) as client:  # ✅ timeout augmenté
+            r = await client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json=payload,
+                headers=_get_headers(),
+            )
         r.raise_for_status()
-        return r.json().get("response", "").strip()
 
-    except Exception:
-        # Fallback sans LLM si Ollama est indisponible
+        raw     = r.json().get("response", "").strip()
+        cleaned = _clean_llm_output(raw)
+
+        print(f"[DEBUG RESPONSE RAW] '{raw[:100]}...'")  # ✅ debug
+        return cleaned if cleaned else _fallback_response(weather_data, city, language)
+
+    except Exception as e:
+        print(f"[DEBUG RESPONSE ERROR] {e}")
         return _fallback_response(weather_data, city, language)
 
 
 def _fallback_response(
     weather_data: dict,
     city:         str,
-    language:     str = "fr",          # ← NOUVEAU PARAMÈTRE
+    language:     str = "fr",
 ) -> str:
     """Réponse formatée directement sans LLM — multilingue."""
     if weather_data["type"] == "current":
@@ -124,7 +144,6 @@ def _fallback_response(
                 f"In {city}, the current temperature is {temp}°C ({desc}). "
                 f"Wind: {wind} km/h, humidity: {hum}%."
             )
-        # Défaut français
         return (
             f"À {city}, il fait actuellement {temp}°C ({desc}). "
             f"Vent : {wind} km/h, humidité : {hum}%."
@@ -132,7 +151,7 @@ def _fallback_response(
 
     days = weather_data.get("days", [])
     if days:
-        d = days[0]
+        d     = days[0]
         t_min = d["temp_min"]
         t_max = d["temp_max"]
         desc  = d["description"]
@@ -153,4 +172,20 @@ def _fallback_response(
             f"{t_min}°C à {t_max}°C, {desc}."
         )
 
-    return city
+    return _fallback_response_minimal(weather_data, city, language)
+
+
+def _fallback_response_minimal(
+    weather_data: dict,
+    city:         str,
+    language:     str = "fr",
+) -> str:
+    """Fallback ultime — ne retourne jamais une chaîne vide."""
+    temp = weather_data.get("temp", "N/A")
+    desc = weather_data.get("description", "")
+
+    if language == "ar":
+        return f"الطقس في {city}: {temp}°C، {desc}."
+    if language == "en":
+        return f"Weather in {city}: {temp}°C, {desc}."
+    return f"Météo à {city} : {temp}°C, {desc}."

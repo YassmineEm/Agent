@@ -165,6 +165,11 @@ def _build_extra(agent: str, context: list[dict], geo: dict | None) -> dict:
 
     return extra
 
+def _enrich_sql_question(question: str, agent_descriptions: dict) -> str:
+    ctx = agent_descriptions.get("sql", "").strip()
+    if not ctx:
+        return question
+    return f"[CONTEXTE BASE DE DONNÉES]\n{ctx}\n[FIN DU CONTEXTE]\n\n{question}"
 
 async def _run_step(
     step:       dict,
@@ -172,28 +177,19 @@ async def _run_step(
     context:    list[dict],
     geo:        dict | None = None,
     language:   str         = "fr",
+    agent_descriptions: dict | None = None
 ) -> list[dict]:
     """Exécute un step — peut contenir 1 ou N agents."""
+    agent_descriptions = agent_descriptions or {}
     tasks = []
     for agent, sub_q in step.items():
         enriched_q = _inject_context(sub_q, context)
-        if enriched_q != sub_q:
-            log.info(
-                "Context injecté",
-                agent=agent,
-                enriched=enriched_q[:80],
-            )
-
+        if agent == "sql":                                 
+            enriched_q = _enrich_sql_question(enriched_q, agent_descriptions)
         extra = _build_extra(agent, context, geo)
-
-        log.info(
-            "Question envoyée",
-            agent=agent,
-            question=enriched_q[:80],
-            has_extra=bool(extra),
-        )
-        tasks.append(call_agent(agent, enriched_q, chatbot_id, extra=extra, language=language,))
-
+        if agent == "sql":
+            extra["admin_rules"] = agent_descriptions.get("sql", "")
+        tasks.append(call_agent(agent, enriched_q, chatbot_id, extra=extra, language=language))
     return list(await asyncio.gather(*tasks))
 
 
@@ -202,6 +198,7 @@ async def execute(
     chatbot_id: str        = "",
     geo:        dict | None = None,     # ← {"lat": 33.5, "lng": -7.6} depuis main
     language:   str         = "fr",
+    agent_descriptions: dict | None = None
 ) -> list[dict]:
     """
     Exécute le plan selon sa stratégie.
@@ -223,7 +220,10 @@ async def execute(
 
     if strategy == "parallel":
         # Chaque step est exécuté indépendamment en parallèle
-        tasks = [_run_step(step, chatbot_id, [], geo) for step in steps]
+        tasks = [
+            _run_step(step, chatbot_id, [], geo, language, agent_descriptions)
+            for step in steps
+        ]
         results_list = await asyncio.gather(*tasks)
         for results in results_list:
             all_results.extend(results)
@@ -241,7 +241,7 @@ async def execute(
                 agent=agent_name,
             )
 
-            results = await _run_step(step, chatbot_id, context, geo)
+            results = await _run_step(step, chatbot_id, context, geo, language, agent_descriptions)
             context.extend(results)
             all_results.extend(results)
 

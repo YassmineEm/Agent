@@ -1,38 +1,41 @@
-<div class="border border-gray-300 rounded-lg p-4 bg-gray-50 mb-4 sql-connection-row">
+<div x-data="{
+    dbType: '',
+    showSqliteFields: false,
+    showNetworkFields: false,
+    init() {
+        this.updateFieldsVisibility();
+    },
+    updateFieldsVisibility() {
+        this.showSqliteFields = this.dbType === 'sqlite';
+        this.showNetworkFields = this.dbType !== 'sqlite' && this.dbType !== '';
+    }
+}" x-init="init()" class="border border-gray-300 rounded-lg p-4 bg-gray-50 mb-4 sql-connection-row">
+    
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Connection Name <span class="text-red-500">*</span>
             </label>
-            <input
-                type="text"
-                name="sql_connection_name[]"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="ex: flight_db_01"
-                required
-            >
+            <input type="text" name="sql_connection_name[]" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                   placeholder="ex: flight_db_01" required>
         </div>
+        
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Database Name <span class="text-red-500">*</span>
             </label>
-            <input
-                type="text"
-                name="sql_db_name[]"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="ex: Global Flight Operations"
-                required
-            >
+            <input type="text" name="sql_db_name[]" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                   placeholder="ex: Global Flight Operations" required>
         </div>
+        
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Database Type <span class="text-red-500">*</span>
             </label>
-            <select
-                name="sql_db_type[]"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-            >
+            <select name="sql_db_type[]" x-model="dbType" @change="updateFieldsVisibility()"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
                 <option value="">-- Sélectionner --</option>
                 <option value="postgresql">PostgreSQL</option>
                 <option value="mysql">MySQL</option>
@@ -41,37 +44,115 @@
                 <option value="oracle">Oracle</option>
             </select>
         </div>
+    </div>
+
+    <!-- Champs pour SQLite (affichés uniquement quand SQLite est sélectionné) -->
+    <div x-show="showSqliteFields" x-cloak class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h4 class="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+            <i class="fas fa-database mr-2"></i>Configuration SQLite
+        </h4>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                Connection String <span class="text-red-500">*</span>
+                Chemin du fichier SQLite <span class="text-red-500">*</span>
             </label>
-            <input
-                type="text"
-                name="sql_connection_string[]"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-                placeholder="ex: sqlite:///database/flight.sqlite"
-                required
-            >
-            <p class="mt-1 text-xs text-gray-500">Format: <code>postgresql://user:pass@host/dbname</code></p>
+            <input type="text" name="sql_sqlite_path[]" 
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                   placeholder="ex: database/carburant.db or /var/data/mydb.sqlite">
+            <p class="mt-1 text-xs text-gray-500">Chemin relatif ou absolu vers le fichier .sqlite</p>
         </div>
     </div>
+
+    <!-- Champs pour PostgreSQL, MySQL, MSSQL, Oracle (affichés quand une base réseau est sélectionnée) -->
+    <div x-show="showNetworkFields" x-cloak class="mt-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Host <span class="text-red-500">*</span>
+                </label>
+                <input type="text" name="sql_host[]" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="localhost or 192.168.1.100">
+                <p class="mt-1 text-xs text-gray-400">ex: localhost, host.docker.internal, 192.168.1.100</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Port <span class="text-red-500">*</span>
+                </label>
+                <input type="number" name="sql_port[]" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="5432 (PostgreSQL) / 3306 (MySQL)">
+                <p class="mt-1 text-xs text-gray-400">PostgreSQL: 5432 | MySQL: 3306 | MSSQL: 1433 | Oracle: 1521</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Database Name <span class="text-red-500">*</span>
+                </label>
+                <input type="text" name="sql_database[]" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="Nom de la base de données">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Username
+                </label>
+                <input type="text" name="sql_username[]" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="Database username">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                </label>
+                <input type="password" name="sql_password[]" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="Database password">
+            </div>
+        </div>
+        
+        <div class="mt-3 p-3 bg-gray-100 rounded-lg">
+            <p class="text-xs text-gray-600">
+                <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                La chaîne de connexion sera automatiquement construite au format : 
+                <code class="text-xs bg-white px-1 py-0.5 rounded">postgresql://user:pass@host:port/database</code>
+            </p>
+        </div>
+    </div>
+
+    <!-- Description de la base pour le routeur IA -->
+    <div class="mt-4">
+        <label class="block text-xs font-medium text-gray-600 mb-1">
+            Description de la base 
+            <span class="text-gray-400 text-xs font-normal">(optionnelle mais recommandée)</span>
+        </label>
+        <textarea name="sql_agent_description[]" rows="2"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Contient les stations-service, prix carburant, coordonnées GPS, lubrifiants..."></textarea>
+        <p class="mt-1 text-xs text-gray-400">
+            <i class="fas fa-robot mr-1"></i>
+            Cette description aide l'IA à choisir la bonne base de données pour chaque question.
+        </p>
+    </div>
+
     <div class="mt-3 flex items-center justify-between">
         <div class="flex items-center">
-            <input
-                type="checkbox"
-                name="sql_is_active[]"
-                value="on"
-                checked
-                class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-            >
+            <input type="checkbox" name="sql_is_active[]" value="on" checked
+                   class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
             <label class="ml-2 text-sm text-gray-700">Active</label>
         </div>
-        <button
-            type="button"
-            onclick="this.closest('.sql-connection-row').remove()"
-            class="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-        >
+        <button type="button" onclick="this.closest('.sql-connection-row').remove()"
+                class="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors">
             <i class="fas fa-trash mr-1"></i>Supprimer
         </button>
     </div>
 </div>
+
+<!-- Style pour x-cloak (évite le flash des éléments cachés) -->
+<style>
+    [x-cloak] { 
+        display: none !important; 
+    }
+</style>

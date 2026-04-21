@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str
     RAG_LLM_MODEL: str = "qwen3:8b"
 
+    # ─── Authentification Cloudflare ─────────────────────────────────
+    CF_ACCESS_CLIENT_ID: str = ""
+    CF_ACCESS_CLIENT_SECRET: str = ""
+
     EMBED_MODEL:       str = "bge-m3"
     EMBED_VECTOR_SIZE: int = 1024
 
@@ -17,10 +21,10 @@ class Settings(BaseSettings):
     QDRANT_PORT: int = 6333
     QDRANT_COLLECTION: str = "akwa_knowledge"
 
-    CHUNK_SIZE: int = 512
-    CHUNK_OVERLAP: int = 64
+    CHUNK_SIZE: int = 800
+    CHUNK_OVERLAP: int = 100
     TOP_K_RETRIEVE: int = 20
-    TOP_K_FINAL: int = 4
+    TOP_K_FINAL: int = 12
     MIN_CONFIDENCE_SCORE: float = 0.3
 
     # ── API ───────────────────────────────────────────────────────────────────

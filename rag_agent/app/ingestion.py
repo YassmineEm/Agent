@@ -1,33 +1,32 @@
 """
 ingestion.py — Pipeline d'ingestion des documents AKWA
 
-Formats supportés (INCHANGÉS) :
+Formats supportés :
     PDF, DOCX/DOC, CSV, XLSX/XLS, TXT, JSON, Markdown
 
-NOUVEAU — Analyse vision (Qwen2.5-VL) :
-    Quand un PDF ou un DOCX contient des images embarquées (graphiques, schémas,
-    figures, tableaux sous forme d'image), chaque image est extraite puis analysée
-    par Qwen2.5-VL. La description produite est ajoutée comme chunk supplémentaire
-    dans Qdrant — en plus des chunks texte, jamais à la place.
+CHUNKING INTELLIGENT (nouveau) :
+    Le splitter détecte automatiquement si un fichier texte contient des blocs
+    structurés séparés par des lignes répétitives (====, ----, ***...).
+    Si oui → chaque bloc est traité comme unité sémantique autonome.
+    Si un bloc dépasse CHUNK_SIZE → il est découpé EN CONSERVANT le titre du
+    bloc en tête de chaque sous-chunk (préfixe contexte).
+    Cela garantit que "Prix : 183.33 MAD" reste associé à "Qualix 10W40 5L"
+    même si le bloc fait 1335 chars et CHUNK_SIZE = 512.
 
-    Le pipeline textuel existant est conservé à l'identique :
-        - Mêmes loaders LangChain (PyPDFLoader, Docx2txtLoader, TextLoader…)
-        - Même splitter RecursiveCharacterTextSplitter (512 tokens, overlap 64)
-        - Même interface ingest_file() appelée par main.py
+    Ce mécanisme est générique : il fonctionne pour n'importe quel fichier
+    structuré (fiches produits, FAQ, documentation technique, etc.)
+    sans nécessiter de reformatage manuel.
 
-    Les chunks visuels passent par le même pipeline d'embedding :
-        bge-m3 (dense 1024d) + BM25 (sparse) → Qdrant akwa_knowledge
+    Pour les fichiers non structurés (prose continue) → fallback sur
+    RecursiveCharacterTextSplitter standard.
 
-    Formats avec extraction visuelle :
-        PDF  → PyMuPDF extrait les images page par page
-        DOCX → extraction ZIP depuis word/media/
-
-    Formats sans extraction visuelle (pas d'images embarquées possibles) :
-        CSV, XLSX, TXT, JSON, Markdown → pipeline texte seul, inchangé
+ANALYSE VISION (Qwen2.5-VL) :
+    PDF et DOCX avec images embarquées → description ajoutée comme chunk visuel.
 """
 
 import io
 import os
+import re
 import json
 import asyncio
 import tempfile
@@ -43,7 +42,6 @@ from app.vision import vision_analyzer
 
 log = get_logger(__name__)
 
-# ── Extensions supportées (INCHANGÉES) ───────────────────────────────────────
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".docx", ".doc",
     ".csv", ".xlsx", ".xls",
@@ -62,10 +60,6 @@ class FileType(str, Enum):
 
 
 def detect_file_type(filename: str) -> FileType:
-    """
-    Retourne le FileType correspondant à l'extension.
-    Lève ValueError si le format n'est pas supporté.
-    """
     ext = os.path.splitext(filename.lower())[1]
     mapping = {
         ".pdf":  FileType.PDF,
@@ -86,42 +80,219 @@ def detect_file_type(filename: str) -> FileType:
     return mapping[ext]
 
 
-# ── Splitter partagé (INCHANGÉ) ───────────────────────────────────────────────
-def _make_splitter() -> RecursiveCharacterTextSplitter:
-    return RecursiveCharacterTextSplitter(
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
-        length_function=len,
-    )
+# ══════════════════════════════════════════════════════════════════════════════
+# CHUNKING INTELLIGENT — générique, sans reformatage manuel
+# ══════════════════════════════════════════════════════════════════════════════
 
+def _detect_block_separator(text: str) -> Optional[str]:
+    """
+    Détecte si le texte contient des séparateurs de blocs structurels
+    (lignes composées d'un seul caractère répété : ====, ----, ****, etc.)
+
+    Retourne le pattern regex du séparateur si trouvé avec ≥ 3 occurrences,
+    sinon None (→ fallback sur splitter standard).
+
+    Exemples détectés :
+        "================" → pattern r'\n=====+\n'
+        "----------------" → pattern r'\n-----+\n'
+        "****************" → pattern r'\n\*\*\*\*\*+\n'
+    """
+    lines = text.split('\n')
+    counts: dict[str, int] = {}
+
+    for line in lines:
+        stripped = line.strip()
+        # Ligne structurelle : ≥ 10 chars, un seul caractère unique
+        if len(stripped) >= 10 and len(set(stripped)) == 1:
+            char = re.escape(stripped[0])
+            pattern = rf'\n{char}{{5,}}\n'
+            counts[pattern] = counts.get(pattern, 0) + 1
+
+    if not counts:
+        return None
+
+    best_pattern = max(counts, key=counts.get)
+    if counts[best_pattern] >= 3:
+        log.debug(
+            "Séparateur structurel détecté",
+            pattern=best_pattern,
+            occurrences=counts[best_pattern],
+        )
+        return best_pattern
+
+    return None
+
+
+def _extract_block_title(block: str) -> str:
+    """
+    Extrait la première ligne significative d'un bloc comme titre de contexte.
+    Ignore les séparateurs (----) et les lignes vides.
+
+    Exemple : "PRODUIT : Afriquia Qualix 10W40 5L               "
+          → "PRODUIT : Afriquia Qualix 10W40 5L"
+    """
+    for line in block.strip().split('\n'):
+        stripped = line.strip()
+        # Ignorer lignes vides, séparateurs, et lignes trop courtes
+        if stripped and len(set(stripped)) > 1 and len(stripped) > 3:
+            return stripped[:120]
+    return ""
+
+
+def _smart_chunk_block(
+    block: str,
+    title: str,
+    chunk_size: int,
+    overlap: int,
+) -> List[str]:
+    """
+    Découpe un bloc en chunks en CONSERVANT le titre (contexte) en tête
+    de chaque sous-chunk.
+
+    Logique :
+    - Si le bloc tient dans chunk_size → 1 seul chunk (cas idéal)
+    - Sinon → découpe ligne par ligne avec :
+        * Préfixe "[Contexte: <titre>]" sur chaque sous-chunk
+        * Overlap sur le texte précédent pour la continuité sémantique
+
+    Garantit que le nom du produit/section reste toujours présent dans
+    chaque chunk même si le prix est sur la dernière ligne du bloc.
+    """
+    block = block.strip()
+
+    if len(block) <= chunk_size:
+        return [block]
+
+    # Le bloc est trop grand → découpage avec répétition du contexte
+    title_prefix = f"[Contexte: {title}]\n" if title else ""
+    lines = block.split('\n')
+    chunks: List[str] = []
+    current = title_prefix
+
+    for line in lines:
+        candidate = current + line + '\n'
+        if len(candidate) <= chunk_size:
+            current = candidate
+        else:
+            # Sauvegarder le chunk courant s'il a du contenu réel
+            content_only = current[len(title_prefix):].strip()
+            if content_only:
+                chunks.append(current.strip())
+
+            # Nouveau chunk : titre + overlap du chunk précédent
+            if overlap > 0 and len(current) > len(title_prefix):
+                overlap_text = current[len(title_prefix):][-overlap:]
+            else:
+                overlap_text = ""
+
+            current = title_prefix + overlap_text + line + '\n'
+
+    # Dernier chunk
+    content_only = current[len(title_prefix):].strip()
+    if content_only:
+        chunks.append(current.strip())
+
+    return chunks if chunks else [block[:chunk_size]]
+
+
+def _smart_split_text(
+    text: str,
+    filename: str,
+    chunk_size: int,
+    overlap: int,
+) -> List[str]:
+    """
+    Splitter intelligent en 2 niveaux :
+
+    Niveau 1 — Détection de structure :
+        Si le texte contient des séparateurs répétitifs (====, ----...)
+        → découper par ces séparateurs naturels (1 bloc = 1 entité sémantique)
+
+    Niveau 2 — Découpage des blocs trop grands :
+        Si un bloc > chunk_size → _smart_chunk_block() avec répétition du titre
+
+    Fallback — Pas de structure détectée :
+        → RecursiveCharacterTextSplitter standard (comportement original)
+    """
+    separator = _detect_block_separator(text)
+
+    if separator:
+        # ── Chemin structuré : blocs autonomes ───────────────────────────────
+        raw_blocks = re.split(separator, text)
+        blocks = [b.strip() for b in raw_blocks if b.strip()]
+
+        log.info(
+            "Chunking structuré activé",
+            filename=filename,
+            nb_blocks=len(blocks),
+            separator=separator,
+        )
+
+        all_chunks: List[str] = []
+        for block in blocks:
+            title = _extract_block_title(block)
+            chunks = _smart_chunk_block(block, title, chunk_size, overlap)
+            all_chunks.extend(chunks)
+            log.debug(
+                "Bloc découpé",
+                title=title[:60],
+                nb_chunks=len(chunks),
+                block_size=len(block),
+            )
+
+        log.info(
+            "Chunking structuré terminé",
+            filename=filename,
+            total_chunks=len(all_chunks),
+        )
+        return all_chunks
+
+    else:
+        # ── Fallback : splitter standard RecursiveCharacterTextSplitter ──────
+        log.info(
+            "Chunking standard activé (pas de structure détectée)",
+            filename=filename,
+        )
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=overlap,
+            length_function=len,
+        )
+        return splitter.split_text(text)
+
+
+def _split_documents_smart(
+    docs: List[Document],
+    filename: str,
+    chunk_size: int,
+    overlap: int,
+) -> List[Document]:
+    """
+    Applique _smart_split_text sur chaque Document et retourne
+    une liste de Documents avec métadonnées préservées.
+    """
+    result: List[Document] = []
+    for doc in docs:
+        text_chunks = _smart_split_text(
+            doc.page_content, filename, chunk_size, overlap
+        )
+        for chunk_text in text_chunks:
+            result.append(Document(
+                page_content=chunk_text,
+                metadata=dict(doc.metadata),
+            ))
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PIPELINE D'INGESTION
+# ══════════════════════════════════════════════════════════════════════════════
 
 class DocumentIngestion:
-    """
-    Pipeline d'ingestion complet.
 
-    Méthodes publiques :
-        ingest_file()              ← appelé par main.py (signature inchangée)
-
-    Méthodes privées texte (ORIGINALES — loaders LangChain conservés) :
-        _load_pdf()
-        _load_docx()
-        _load_txt()
-        _load_markdown()
-        _load_csv()
-        _load_excel_openpyxl()
-        _load_json()
-
-    Méthodes privées vision (NOUVELLES) :
-        _extract_visual_chunks_from_pdf()
-        _extract_visual_chunks_from_docx()
-    """
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # LOADERS TEXTE — ORIGINAUX (loaders LangChain conservés à l'identique)
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Loaders texte (inchangés) ─────────────────────────────────────────────
 
     def _load_pdf(self, tmp_path: str, filename: str) -> List[Document]:
-        """Extrait le texte sélectionnable via PyPDFLoader (LangChain)."""
         from langchain_community.document_loaders import PyPDFLoader
         docs = PyPDFLoader(tmp_path).load()
         for doc in docs:
@@ -130,7 +301,6 @@ class DocumentIngestion:
         return docs
 
     def _load_docx(self, tmp_path: str, filename: str) -> List[Document]:
-        """Extrait le texte via Docx2txtLoader (LangChain)."""
         from langchain_community.document_loaders import Docx2txtLoader
         docs = Docx2txtLoader(tmp_path).load()
         for doc in docs:
@@ -139,7 +309,6 @@ class DocumentIngestion:
         return docs
 
     def _load_txt(self, tmp_path: str, filename: str) -> List[Document]:
-        """Charge un fichier texte brut via TextLoader (LangChain)."""
         from langchain_community.document_loaders import TextLoader
         docs = TextLoader(tmp_path, encoding="utf-8").load()
         for doc in docs:
@@ -148,7 +317,6 @@ class DocumentIngestion:
         return docs
 
     def _load_markdown(self, tmp_path: str, filename: str) -> List[Document]:
-        """Charge un fichier Markdown via TextLoader (LangChain)."""
         from langchain_community.document_loaders import TextLoader
         docs = TextLoader(tmp_path, encoding="utf-8").load()
         for doc in docs:
@@ -157,7 +325,6 @@ class DocumentIngestion:
         return docs
 
     def _load_csv(self, tmp_path: str, filename: str) -> List[Document]:
-        """Chaque ligne CSV → 1 Document (une ligne = une entrée exploitable)."""
         import csv
         docs = []
         with open(tmp_path, encoding="utf-8", errors="replace") as f:
@@ -177,7 +344,6 @@ class DocumentIngestion:
         return docs
 
     def _load_excel_openpyxl(self, tmp_path: str, filename: str) -> List[Document]:
-        """Chaque ligne Excel → 1 Document via openpyxl."""
         import openpyxl
         wb = openpyxl.load_workbook(tmp_path, read_only=True, data_only=True)
         docs = []
@@ -212,7 +378,6 @@ class DocumentIngestion:
         return docs
 
     def _load_json(self, tmp_path: str, filename: str) -> List[Document]:
-        """Charge un JSON : liste → 1 Document par item, dict → 1 Document."""
         with open(tmp_path, encoding="utf-8") as f:
             data = json.load(f)
         docs = []
@@ -238,11 +403,7 @@ class DocumentIngestion:
             ))
         return docs
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # EXTRACTION VISUELLE — NOUVEAU
-    # Appelé en COMPLÉMENT des loaders texte, jamais à la place.
-    # Retourne [] si vision désactivée, PyMuPDF absent, ou aucune image trouvée.
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Extraction visuelle (inchangée) ───────────────────────────────────────
 
     async def _extract_visual_chunks_from_pdf(
         self,
@@ -250,31 +411,15 @@ class DocumentIngestion:
         filename: str,
         doc_type: str,
     ) -> List[Document]:
-        """
-        Extrait toutes les images embarquées dans un PDF (via PyMuPDF)
-        et les analyse avec Qwen2.5-VL.
-
-        Chaque image exploitable devient un Document avec :
-            page_content = "[Figure page N — source: fichier.pdf]\\n<description Qwen>"
-            metadata.content_type = "visual"
-
-        Les images < VISION_MIN_IMAGE_BYTES sont ignorées (logos, puces déco).
-        """
         if not settings.VISION_ENABLED:
             return []
-
         try:
-            import fitz  # PyMuPDF
+            import fitz
         except ImportError:
-            log.warning(
-                "PyMuPDF non installé — extraction visuelle PDF désactivée. "
-                "Ajouter 'pymupdf' dans requirements.txt"
-            )
+            log.warning("PyMuPDF non installé — extraction visuelle PDF désactivée.")
             return []
 
-        # ── Collecter toutes les images du PDF ────────────────────────────────
         images_to_analyze: List[tuple] = []
-
         try:
             pdf = fitz.open(stream=file_bytes, filetype="pdf")
             for page_num in range(len(pdf)):
@@ -289,48 +434,29 @@ class DocumentIngestion:
                         context = f"page {page_num + 1} — {filename}"
                         images_to_analyze.append((img_bytes, context))
                     except Exception as e:
-                        log.debug(
-                            "Image PDF non extractible",
-                            page=page_num + 1,
-                            error=str(e),
-                        )
+                        log.debug("Image PDF non extractible", page=page_num + 1, error=str(e))
             pdf.close()
         except Exception as e:
-            log.warning(
-                "Erreur ouverture PDF pour extraction visuelle",
-                filename=filename,
-                error=str(e),
-            )
+            log.warning("Erreur ouverture PDF pour extraction visuelle", filename=filename, error=str(e))
             return []
 
         if not images_to_analyze:
             return []
 
-        log.info(
-            "Vision PDF : images détectées",
-            filename=filename,
-            count=len(images_to_analyze),
-        )
-
-        # ── Analyse en parallèle (concurrence limitée dans vision_analyzer) ──
+        log.info("Vision PDF : images détectées", filename=filename, count=len(images_to_analyze))
         descriptions = await vision_analyzer.analyze_images_batch(images_to_analyze)
 
-        # ── Construire les Documents visuels ──────────────────────────────────
         visual_docs = []
         for (_, context), description in zip(images_to_analyze, descriptions):
             if not description:
                 continue
-            # context = "page 3 — fiche_gpl.pdf"
-            page_num_str = context.split("—")[0].strip()   # "page 3"
+            page_num_str = context.split("—")[0].strip()
             try:
                 page_num = int(page_num_str.replace("page", "").strip())
             except ValueError:
                 page_num = 0
-
             visual_docs.append(Document(
-                page_content=(
-                    f"[Figure {page_num_str} — source: {filename}]\n{description}"
-                ),
+                page_content=f"[Figure {page_num_str} — source: {filename}]\n{description}",
                 metadata={
                     "source":       filename,
                     "filename":     filename,
@@ -341,12 +467,7 @@ class DocumentIngestion:
                 },
             ))
 
-        log.info(
-            "Vision PDF : chunks visuels créés",
-            filename=filename,
-            images_analyzed=len(images_to_analyze),
-            chunks_created=len(visual_docs),
-        )
+        log.info("Vision PDF : chunks visuels créés", filename=filename, chunks_created=len(visual_docs))
         return visual_docs
 
     async def _extract_visual_chunks_from_docx(
@@ -355,21 +476,11 @@ class DocumentIngestion:
         filename: str,
         doc_type: str,
     ) -> List[Document]:
-        """
-        Extrait toutes les images d'un DOCX (format ZIP → word/media/)
-        et les analyse avec Qwen2.5-VL.
-
-        Chaque image exploitable devient un Document avec :
-            page_content = "[Figure N — source: fichier.docx]\\n<description Qwen>"
-            metadata.content_type = "visual"
-        """
         if not settings.VISION_ENABLED:
             return []
-
         import zipfile
 
         images_to_analyze: List[tuple] = []
-
         try:
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
                 media_files = [
@@ -384,24 +495,14 @@ class DocumentIngestion:
                         continue
                     context = f"figure {i + 1} — {filename}"
                     images_to_analyze.append((img_bytes, context))
-
         except Exception as e:
-            log.warning(
-                "Erreur extraction images DOCX",
-                filename=filename,
-                error=str(e),
-            )
+            log.warning("Erreur extraction images DOCX", filename=filename, error=str(e))
             return []
 
         if not images_to_analyze:
             return []
 
-        log.info(
-            "Vision DOCX : images détectées",
-            filename=filename,
-            count=len(images_to_analyze),
-        )
-
+        log.info("Vision DOCX : images détectées", filename=filename, count=len(images_to_analyze))
         descriptions = await vision_analyzer.analyze_images_batch(images_to_analyze)
 
         visual_docs = []
@@ -409,9 +510,7 @@ class DocumentIngestion:
             if not description:
                 continue
             visual_docs.append(Document(
-                page_content=(
-                    f"[{context.capitalize()} — source: {filename}]\n{description}"
-                ),
+                page_content=f"[{context.capitalize()} — source: {filename}]\n{description}",
                 metadata={
                     "source":       filename,
                     "filename":     filename,
@@ -422,17 +521,10 @@ class DocumentIngestion:
                 },
             ))
 
-        log.info(
-            "Vision DOCX : chunks visuels créés",
-            filename=filename,
-            images_analyzed=len(images_to_analyze),
-            chunks_created=len(visual_docs),
-        )
+        log.info("Vision DOCX : chunks visuels créés", filename=filename, chunks_created=len(visual_docs))
         return visual_docs
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # PIPELINE PRINCIPAL — ingest_file (interface inchangée)
-    # ══════════════════════════════════════════════════════════════════════════
+    # ── Pipeline principal ────────────────────────────────────────────────────
 
     async def ingest_file(
         self,
@@ -443,16 +535,15 @@ class DocumentIngestion:
         description: str = "",
     ) -> dict:
         """
-        Point d'entrée unique — appelé par main.py (signature inchangée).
+        Point d'entrée unique — signature inchangée.
 
         Étapes :
             1. Détection du type de fichier
-            2. Écriture fichier temporaire
-            3. Extraction texte — loaders LangChain originaux (INCHANGÉ)
-            4. Extraction visuelle si PDF ou DOCX — Qwen2.5-VL (NOUVEAU)
-            5. Fusion texte + visuels
-            6. Chunking texte (splitter original) + enrichissement métadonnées
-            7. Indexation Qdrant (INCHANGÉ)
+            2. Extraction texte via loaders LangChain
+            3. Extraction visuelle (PDF/DOCX uniquement)
+            4. Chunking intelligent (structuré ou standard selon le fichier)
+            5. Enrichissement métadonnées
+            6. Indexation Qdrant
         """
         from app.qdrant_store import qdrant_store
 
@@ -465,14 +556,13 @@ class DocumentIngestion:
             collection=collection,
         )
 
-        # ── 1. Fichier temporaire (les loaders LangChain nécessitent un path) ─
         suffix = os.path.splitext(filename)[1]
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(file_bytes)
             tmp_path = tmp.name
 
         try:
-            # ── 2. Extraction texte — ORIGINALE ──────────────────────────────
+            # ── Extraction texte ──────────────────────────────────────────────
             text_docs: List[Document] = []
 
             if file_type == FileType.PDF:
@@ -490,7 +580,7 @@ class DocumentIngestion:
             elif file_type == FileType.MARKDOWN:
                 text_docs = self._load_markdown(tmp_path, filename)
 
-            # ── 3. Extraction visuelle — NOUVEAU (PDF et DOCX uniquement) ────
+            # ── Extraction visuelle ───────────────────────────────────────────
             visual_docs: List[Document] = []
 
             if file_type == FileType.PDF:
@@ -503,13 +593,11 @@ class DocumentIngestion:
                 )
 
         finally:
-            # Nettoyage du fichier temporaire dans tous les cas
             try:
                 os.unlink(tmp_path)
             except Exception:
                 pass
 
-        # ── 4. Fusion texte + visuels ─────────────────────────────────────────
         all_docs = text_docs + visual_docs
 
         if not all_docs:
@@ -518,14 +606,12 @@ class DocumentIngestion:
                 "Vérifiez que le fichier n'est pas vide ou corrompu."
             )
 
-        # ── 5. Chunking + enrichissement métadonnées ──────────────────────────
-        splitter = _make_splitter()
+        # ── Chunking ──────────────────────────────────────────────────────────
         chunked_docs: List[Document] = []
 
         for doc in all_docs:
             if doc.metadata.get("content_type") == "visual":
-                # Les chunks visuels ne sont PAS re-splittés :
-                # Qwen2.5-VL produit déjà un texte structuré et cohérent.
+                # Chunks visuels : pas de re-split, enrichissement métadonnées seul
                 doc.metadata.update({
                     "doc_type":    doc_type,
                     "filename":    filename,
@@ -533,9 +619,14 @@ class DocumentIngestion:
                 })
                 chunked_docs.append(doc)
             else:
-                # Chunks texte : splitter original (512 tokens, overlap 64)
-                splits = splitter.split_documents([doc])
-                for chunk in splits:
+                # Chunks texte : chunking intelligent (structuré ou standard)
+                smart_chunks = _split_documents_smart(
+                    [doc],
+                    filename=filename,
+                    chunk_size=settings.CHUNK_SIZE,
+                    overlap=settings.CHUNK_OVERLAP,
+                )
+                for chunk in smart_chunks:
                     chunk.metadata.update({
                         "doc_type":     doc_type,
                         "filename":     filename,
@@ -547,17 +638,11 @@ class DocumentIngestion:
         if not chunked_docs:
             raise ValueError(f"Aucun chunk produit pour '{filename}'.")
 
-        # ── 6. Indexation Qdrant — INCHANGÉE ─────────────────────────────────
+        # ── Indexation Qdrant ─────────────────────────────────────────────────
         indexed_count = qdrant_store.add_documents(collection, chunked_docs)
 
-        text_count   = sum(
-            1 for d in chunked_docs
-            if d.metadata.get("content_type") != "visual"
-        )
-        visual_count = sum(
-            1 for d in chunked_docs
-            if d.metadata.get("content_type") == "visual"
-        )
+        text_count   = sum(1 for d in chunked_docs if d.metadata.get("content_type") != "visual")
+        visual_count = sum(1 for d in chunked_docs if d.metadata.get("content_type") == "visual")
 
         log.info(
             "Ingestion terminée",
@@ -578,6 +663,54 @@ class DocumentIngestion:
             "visual_chunks":  visual_count,
         }
 
+    async def ingest_multiple_files(
+        self,
+        files: List[tuple],
+        collection: str,
+    ) -> dict:
+        """Ingère plusieurs fichiers en parallèle (max 3 simultanés)."""
+        log.info("Ingestion batch démarrée", total=len(files), collection=collection)
+        semaphore = asyncio.Semaphore(3)
 
-# ── Singleton ─────────────────────────────────────────────────────────────────
+        async def process_file(file_bytes, filename, doc_type, description):
+            async with semaphore:
+                return await self.ingest_file(
+                    file_bytes=file_bytes,
+                    filename=filename,
+                    doc_type=doc_type,
+                    collection=collection,
+                    description=description,
+                )
+
+        tasks = [
+            process_file(fb, fn, dt, desc)
+            for fb, fn, dt, desc in files
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        succeeded, failed = [], []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                failed.append({"filename": files[i][1], "error": str(result)})
+            else:
+                succeeded.append(result)
+
+        log.info(
+            "Ingestion batch terminée",
+            total=len(files),
+            succeeded=len(succeeded),
+            failed=len(failed),
+        )
+
+        return {
+            "status":      "completed",
+            "total_files": len(files),
+            "succeeded":   len(succeeded),
+            "failed":      len(failed),
+            "results":     succeeded,
+            "errors":      failed,
+        }
+
+
+# Singleton
 ingestion = DocumentIngestion()

@@ -134,3 +134,13 @@ class DeleteResponse(BaseModel):
     filename: str
     collection: str
     chunks_deleted: int
+
+
+class BatchIngestResponse(BaseModel):
+    """Résultat de l'indexation de plusieurs documents."""
+    status: str
+    total_files: int
+    succeeded: int
+    failed: int
+    results: List[IngestResponse]
+    errors: List[dict] = []

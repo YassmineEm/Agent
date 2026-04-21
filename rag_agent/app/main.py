@@ -12,6 +12,7 @@ Endpoints :
 """
 import time
 from contextlib import asynccontextmanager
+from typing import List
 
 from fastapi import (
     FastAPI, UploadFile, File, Form, HTTPException, Query,
@@ -27,7 +28,7 @@ from .logger import setup_logging, get_logger
 from .models import (
     QueryRequest, QueryResponse,
     IngestResponse, HealthResponse, ErrorResponse,
-    DocType, DeleteResponse
+    DocType, DeleteResponse, BatchIngestResponse
 )
 from .agent import rag_agent
 from .ingestion import ingestion
@@ -41,6 +42,7 @@ log = get_logger(__name__)
 # ── Constantes rate limiting ──────────────────────────────────────────────────
 RATE_LIMIT_MAX_REQUESTS = 10   # requêtes max par fenêtre
 RATE_LIMIT_WINDOW_SEC   = 60   # fenêtre en secondes
+MAX_BATCH_FILES = 10
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
@@ -266,6 +268,91 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'indexation: {str(e)}")
 
 
+# ── POST /admin/upload-batch (MULTIPLE FILES) ────────────────────────
+
+@app.post(
+    "/admin/upload-batch",
+    response_model=BatchIngestResponse,
+    summary="Uploader plusieurs documents dans la base de connaissances",
+    tags=["Admin"],
+    dependencies=[Depends(require_admin_key)],
+)
+async def upload_documents_batch(
+    files: List[UploadFile] = File(..., description="Liste des fichiers (max 10)"),
+    chatbot_id: str = Form(..., description="ID du chatbot cible"),
+    doc_type: DocType = Form(default=DocType.GENERAL),
+    description: str = Form(default=""),
+) -> BatchIngestResponse:
+
+    if not files:
+        raise HTTPException(status_code=400, detail="Aucun fichier fourni.")
+
+    if len(files) > MAX_BATCH_FILES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Trop de fichiers. Maximum {MAX_BATCH_FILES} fichiers."
+        )
+
+    import os as _os
+    from .ingestion import SUPPORTED_EXTENSIONS
+
+    files_to_ingest = []
+
+    for file in files:
+        if not file.filename:
+            continue
+
+        ext = _os.path.splitext(file.filename.lower())[1]
+
+        if ext not in SUPPORTED_EXTENSIONS:
+            supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+            raise HTTPException(
+                status_code=400,
+                detail=f"Format non supporté : '{file.filename}'. Acceptés : {supported}",
+            )
+
+        content = await file.read()
+
+        if len(content) > 50 * 1024 * 1024:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Fichier trop volumineux : {file.filename}. Max 50 MB"
+            )
+
+        files_to_ingest.append(
+            (content, file.filename, doc_type.value, description)
+        )
+
+    log.info(
+        "Upload batch documents",
+        chatbot_id=chatbot_id,
+        total_files=len(files_to_ingest),
+        filenames=[f[1] for f in files_to_ingest],
+        doc_type=doc_type,
+    )
+
+    try:
+        # Créer la collection si elle n'existe pas
+        qdrant_store.ensure_collection(chatbot_id)
+
+        # Ingestion multiple (parallèle)
+        result = await ingestion.ingest_multiple_files(
+            files=files_to_ingest,
+            collection=chatbot_id,
+        )
+
+        return BatchIngestResponse(**result)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        log.error("Erreur ingestion batch", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'indexation: {str(e)}"
+        )
+
 # ── GET /health ───────────────────────────────────────────────────────────────
 
 @app.get(
@@ -400,3 +487,56 @@ async def root():
         "vision_enabled": settings.VISION_ENABLED,
         "vision_model": settings.VISION_MODEL if settings.VISION_ENABLED else None,
     }
+
+# ── DELETE /admin/collection/{chatbot_id} ─────────────────────────────────────
+
+@app.delete(
+    "/admin/collection/{chatbot_id}",
+    summary="Supprimer toute la collection d'un chatbot",
+    tags=["Admin"],
+    dependencies=[Depends(require_admin_key)],
+)
+async def delete_collection(
+    chatbot_id: str,
+) -> dict:
+    """
+    **Supprime toute la collection Qdrant d'un chatbot.**
+    
+    Cette opération est irréversible. Tous les documents indexés
+    pour ce chatbot seront définitivement supprimés.
+    
+    Utilisé automatiquement par l'AdminUI lorsqu'un chatbot est supprimé.
+    """
+    log.info("Suppression collection demandée", chatbot_id=chatbot_id)
+    
+    try:
+        # Vérifier si la collection existe
+        if not qdrant_store.collection_exists(chatbot_id):
+            log.warning("Collection non trouvée", chatbot_id=chatbot_id)
+            raise HTTPException(
+                status_code=404,
+                detail=f"Collection '{chatbot_id}' non trouvée"
+            )
+        
+        # Supprimer la collection
+        qdrant_store.delete_collection(chatbot_id)
+        
+        # Nettoyer aussi les clés Redis liées à ce chatbot
+        await cache_service.delete_chatbot_data(chatbot_id)
+        
+        log.info("Collection supprimée avec succès", chatbot_id=chatbot_id)
+        
+        return {
+            "status": "success",
+            "chatbot_id": chatbot_id,
+            "message": f"Collection '{chatbot_id}' supprimée"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Erreur suppression collection", chatbot_id=chatbot_id, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la suppression de la collection: {str(e)}"
+        )

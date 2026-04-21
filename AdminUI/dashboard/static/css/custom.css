@@ -73,3 +73,12 @@
 .btn-pulse:hover {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Alpine.js x-cloak */
+[x-cloak] {
+    display: none !important;
+}
+
+.hidden {
+    display: none !important;
+}

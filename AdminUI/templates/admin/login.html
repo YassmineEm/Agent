@@ -1,0 +1,563 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion · AFRIQUIA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%; width: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .split {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ══ PANNEAU GAUCHE — FORMULAIRE ══ */
+        .left {
+            width: 45%;
+            background: linear-gradient(160deg, #0a2e1a 0%, #0d3d22 40%, #083018 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 48px 52px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .left::before {
+            content: "";
+            position: absolute;
+            width: 400px; height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,.06) 0%, transparent 70%);
+            top: -80px; left: -80px;
+            pointer-events: none;
+        }
+
+        .left::after {
+            content: "";
+            position: absolute;
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(100,200,120,.1) 0%, transparent 70%);
+            bottom: -60px; right: -40px;
+            pointer-events: none;
+        }
+
+        /* ── LOGO ── */
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 48px;
+            position: relative; z-index: 1;
+        }
+
+        .brand-emblem {
+            width: 48px; height: 48px;
+            background: #ffffff;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,.25);
+            overflow: hidden;
+        }
+
+        /* Si le logo ne charge pas → fallback texte arabe */
+        .brand-emblem img {
+            width: 36px; height: 36px;
+            object-fit: contain;
+        }
+
+        .brand-emblem .fallback {
+            font-family: 'Tajawal', sans-serif;
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: #0d3d22;
+            display: none; /* caché si l'image charge */
+        }
+
+        .brand-emblem img[src=""] ~ .fallback,
+        .brand-emblem img:not([src]) ~ .fallback { display: flex; }
+
+        .brand-name {
+            font-family: 'Tajawal', sans-serif;
+            font-weight: 800;
+            font-size: 1.2rem;
+            color: #ffffff;
+            letter-spacing: 2.5px;
+        }
+
+        .brand-sub {
+            font-size: .65rem;
+            color: rgba(255,255,255,.45);
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
+        /* ── TITRE ── */
+        .form-title {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.2;
+            margin-bottom: 6px;
+            position: relative; z-index: 1;
+        }
+
+        .form-sub {
+            font-size: .85rem;
+            color: rgba(255,255,255,.45);
+            margin-bottom: 32px;
+            position: relative; z-index: 1;
+        }
+
+        /* ── ERREUR ── */
+        .error-box {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,100,80,.4);
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+            font-size: .8rem; color: #ffb3a7; font-weight: 500;
+            position: relative; z-index: 1;
+            animation: shake .4s ease;
+        }
+
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            25%,75%  { transform: translateX(-4px); }
+            50%      { transform: translateX(4px); }
+        }
+
+        /* ── CHAMPS ── */
+        .field {
+            margin-bottom: 14px;
+            position: relative; z-index: 1;
+        }
+
+        .field label {
+            display: block;
+            font-size: .7rem;
+            font-weight: 600;
+            color: rgba(255,255,255,.5);
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin-bottom: 7px;
+        }
+
+        .field input {
+            width: 100%;
+            background: rgba(255,255,255,.07);
+            border: 1.5px solid rgba(255,255,255,.12);
+            border-radius: 12px;
+            padding: 13px 18px;
+            font-family: 'Inter', sans-serif;
+            font-size: .9rem;
+            color: #fff;
+            outline: none;
+            transition: all .25s;
+        }
+
+        .field input::placeholder { color: rgba(255,255,255,.22); }
+
+        .field input:focus {
+            background: rgba(255,255,255,.12);
+            border-color: rgba(120,230,140,.5);
+            box-shadow: 0 0 0 4px rgba(100,200,120,.1);
+        }
+
+        /* ── OPTIONS ── */
+        .row-opts {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            position: relative; z-index: 1;
+        }
+
+        .remember {
+            display: flex; align-items: center; gap: 7px;
+            font-size: .78rem; color: rgba(255,255,255,.4);
+            cursor: pointer;
+        }
+
+        .remember input[type=checkbox] {
+            width: 15px; height: 15px;
+            accent-color: #4ade80;
+            cursor: pointer;
+        }
+
+        .forgot {
+            font-size: .78rem;
+            color: rgba(255,255,255,.4);
+            text-decoration: underline;
+            cursor: pointer;
+            transition: color .2s;
+        }
+
+        .forgot:hover { color: #86efac; }
+
+        /* ── BOUTON ── */
+        .btn-signin {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: .95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: 0 8px 24px -6px rgba(34,197,94,.45);
+            transition: all .3s;
+            position: relative; z-index: 1;
+            overflow: hidden;
+        }
+
+        .btn-signin::before {
+            content: "";
+            position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+            transform: translateX(-100%);
+            transition: .5s;
+        }
+
+        .btn-signin:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px -6px rgba(34,197,94,.55);
+        }
+
+        .btn-signin:hover::before { transform: translateX(100%); }
+        .btn-signin:active { transform: translateY(0); }
+        .btn-signin i { transition: transform .3s; }
+        .btn-signin:hover i { transform: translateX(4px); }
+
+        /* ══ PANNEAU DROIT ══ */
+        .right {
+            flex: 1;
+            background: #f0fdf4;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 44px 44px 40px;
+        }
+
+        /* Cercles décoratifs verts */
+        .right::before {
+            content: "";
+            position: absolute;
+            width: 480px; height: 480px;
+            background: radial-gradient(circle, rgba(34,197,94,.12) 0%, transparent 65%);
+            top: -120px; right: -80px;
+        }
+
+        .right::after {
+            content: "";
+            position: absolute;
+            width: 320px; height: 320px;
+            background: radial-gradient(circle, rgba(16,185,129,.1) 0%, transparent 65%);
+            bottom: -60px; left: -40px;
+        }
+
+        /* Étoile géométrique verte */
+        .star-wrap {
+            position: absolute;
+            right: 50px; top: 50%;
+            transform: translateY(-50%);
+            z-index: 0;
+            opacity: .18;
+        }
+
+        .star {
+            width: 260px; height: 260px;
+            animation: rotate 25s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* Haut droite */
+        .right-top { position: relative; z-index: 1; }
+
+        .right-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: .7rem;
+            color: #15803d;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .right-tag::before {
+            content: "";
+            width: 7px; height: 7px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: .5; transform: scale(.8); }
+        }
+
+        .right-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: #0a2e1a;
+            line-height: 1.3;
+            max-width: 300px;
+        }
+
+        .right-title span {
+            background: linear-gradient(135deg, #16a34a, #059669);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Témoignage */
+        .testimonial {
+            position: relative; z-index: 1;
+            background: #fff;
+            border: 1px solid #d1fae5;
+            border-radius: 20px;
+            padding: 22px 24px;
+            max-width: 340px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.05);
+        }
+
+        .quote-icon {
+            font-size: 2rem;
+            color: #86efac;
+            line-height: 1;
+            margin-bottom: 10px;
+            font-family: Georgia, serif;
+        }
+
+        .quote-text {
+            font-size: .82rem;
+            color: #374151;
+            line-height: 1.65;
+            margin-bottom: 14px;
+        }
+
+        .quote-author {
+            font-size: .82rem;
+            font-weight: 700;
+            color: #0a2e1a;
+        }
+
+        .quote-role {
+            font-size: .72rem;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .dots {
+            display: flex; gap: 6px; margin-top: 14px;
+        }
+
+        .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #d1fae5;
+        }
+
+        .dot.active {
+            width: 18px;
+            border-radius: 3px;
+            background: #22c55e;
+        }
+
+        /* Carte info */
+        .info-card {
+            position: relative; z-index: 1;
+            background: #fff;
+            border: 1px solid #d1fae5;
+            border-radius: 20px;
+            padding: 18px 22px;
+            max-width: 310px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+
+        .info-card-title {
+            font-size: .9rem;
+            font-weight: 700;
+            color: #0a2e1a;
+            margin-bottom: 5px;
+        }
+
+        .info-card-sub {
+            font-size: .75rem;
+            color: #6b7280;
+            line-height: 1.55;
+            margin-bottom: 12px;
+        }
+
+        .info-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .info-avatars { display: flex; align-items: center; }
+
+        .av {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .6rem; font-weight: 700; color: #fff;
+            margin-left: -8px;
+        }
+
+        .av:first-child { margin-left: 0; }
+        .av1 { background: #16a34a; }
+        .av2 { background: #059669; }
+        .av3 { background: #0d3d22; }
+
+        .av-count {
+            margin-left: 10px;
+            font-size: .7rem;
+            color: #6b7280;
+        }
+
+        .status-dot {
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+        }
+    </style>
+</head>
+<body>
+<div class="split">
+
+    <!-- ══ GAUCHE ══ -->
+    <div class="left">
+
+        <!-- LOGO — remplacer l'URL par votre vrai logo -->
+        <div class="brand">
+            <div class="brand-emblem">
+                <img src="{% static 'images/afriquia-logo.png' %}"
+                    alt="AFRIQUIA"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <span class="fallback">أ</span>
+            </div>
+            <div>
+                <div class="brand-name">AFRIQUIA</div>
+                <div class="brand-sub">Administration · أفريقيا</div>
+            </div>
+        </div>
+
+        <div class="form-title">Bienvenue</div>
+        <div class="form-sub">Entrez vos identifiants pour continuer</div>
+
+        {% if form.errors %}
+        <div class="error-box">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>Identifiants incorrects. Veuillez réessayer.</span>
+        </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'admin:login' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="field">
+                <label>Identifiant</label>
+                <input type="text" name="username" autofocus placeholder="votre identifiant" required>
+            </div>
+
+            <div class="field">
+                <label>Mot de passe</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <div class="row-opts">
+                <label class="remember">
+                    <input type="checkbox" name="remember">
+                    Rester connecté
+                </label>
+                <span class="forgot">Mot de passe oublié ?</span>
+            </div>
+
+            <button type="submit" class="btn-signin">
+                <span>Se connecter</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+
+    </div>
+
+    <!-- ══ DROITE ══ -->
+    <div class="right">
+
+        <!-- Étoile déco verte -->
+        <div class="star-wrap">
+            <svg class="star" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
+                <line x1="130" y1="0"   x2="130" y2="260" stroke="#16a34a" stroke-width="1"/>
+                <line x1="0"   y1="130" x2="260" y2="130" stroke="#16a34a" stroke-width="1"/>
+                <line x1="19"  y1="19"  x2="241" y2="241" stroke="#16a34a" stroke-width="1"/>
+                <line x1="241" y1="19"  x2="19"  y2="241" stroke="#16a34a" stroke-width="1"/>
+                <line x1="0"   y1="78"  x2="260" y2="182" stroke="#16a34a" stroke-width="1"/>
+                <line x1="260" y1="78"  x2="0"   y2="182" stroke="#16a34a" stroke-width="1"/>
+                <line x1="78"  y1="0"   x2="182" y2="260" stroke="#16a34a" stroke-width="1"/>
+                <line x1="182" y1="0"   x2="78"  y2="260" stroke="#16a34a" stroke-width="1"/>
+                <circle cx="130" cy="130" r="70"  fill="none" stroke="#16a34a" stroke-width="1"/>
+                <circle cx="130" cy="130" r="115" fill="none" stroke="#16a34a" stroke-width="1"/>
+            </svg>
+        </div>
+
+        <!-- Haut -->
+        <div class="right-top">
+            <div class="right-tag">Plateforme AFRIQUIA</div>
+            <div class="right-title">
+                Gérez vos<br>
+                <span>Chatbots & Données</span><br>
+                en toute sécurité.
+            </div>
+        </div>
+
+        <!-- Témoignage -->
+        <div class="testimonial">
+            <div class="quote-icon">"</div>
+            <div class="quote-text">
+                La plateforme AFRIQUIA centralise la gestion de nos chatbots intelligents et de nos bases de données en un seul espace sécurisé et intuitif.
+            </div>
+            <div class="quote-author">Équipe AKWA Group</div>
+            <div class="quote-role">Division Innovation & Digital</div>
+            <div class="dots">
+                <div class="dot active"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

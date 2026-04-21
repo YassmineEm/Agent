@@ -9,6 +9,10 @@ class OrchestratorState(TypedDict):
     trace_id:   str
     language:   str
 
+
+    system_prompt: str
+    agent_descriptions: dict[str, str]
+
     # ── Routing ──────────────────────────────────────────────────────
     agents_to_call:      list[str]       # ex: ["sql", "location"]
     execution_plan:      dict            # ex: {"sql": "prix gazoil ?", "location": "..."}

@@ -45,6 +45,7 @@ class QueryRequest(BaseModel):
     question: str
     chatbot_id: str
     language:   str = "fr"
+    admin_rules: str = ""
 
 # --- HEALTH CHECK ---
 @app.get("/health")
@@ -133,7 +134,8 @@ async def handle_query_post(req: QueryRequest):
         model          = model,
         allowed_db_ids = bot_config["db_ids"],
         db_cache       = db_cache,
-        language       = req.language,      # ← NOUVEAU
+        language       = req.language,    
+        admin_rules    = req.admin_rules,  
     )
 
     return {

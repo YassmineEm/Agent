@@ -53,8 +53,10 @@ services:
     environment:
       OLLAMA_BASE_URL:         ${OLLAMA_BASE_URL}
       RAG_LLM_MODEL:           "qwen3:8b"
-      EMBED_MODEL:             "bge-m3"
-      EMBED_VECTOR_SIZE:       "1024"
+      CF_ACCESS_CLIENT_ID: "2c8ae98fc22cfe99e9fcc87fc7fab058.access"
+      CF_ACCESS_CLIENT_SECRET: "4093f9711287f919fd0855a4f9d383bcdceda22599751fe1e32de33df1a207a7"
+      EMBED_MODEL: "BAAI/bge-small-en-v1.5"
+      EMBED_VECTOR_SIZE: "384"
       QDRANT_HOST:             "qdrant"       # nom du container sur réseau internal
       QDRANT_PORT:             "6333"
       REDIS_HOST:              "redis"        # nom du container sur réseau internal
@@ -67,8 +69,8 @@ services:
       VISION_MIN_IMAGE_BYTES:  "5000"
       VISION_TIMEOUT:          "120"
     networks:
-      - internal    # parle à qdrant et redis
-      - akwa_net    # visible par l'orchestrateur
+      - internal    
+      - akwa_net   
     depends_on:
       qdrant:
         condition: service_healthy

@@ -24,4 +24,11 @@ urlpatterns = [
     path('api/chatbots/<int:chat_id>/', views.chatbot_config, name='chatbot_config'),
 
     path('api/chatbots/sql/', chatbots_sql_list, name='chatbots-sql-list'),
+
+    # ── User Management
+    path('users/', views.user_list, name='user_list'),
+    path('user/<str:user_id>/', views.user_detail, name='user_detail'),
+    path('user/<str:user_id>/sync-supabase/', views.sync_user_supabase, name='sync_user_supabase'),
+    path('user/<str:user_id>/add-chatbot/', views.user_add_chatbot, name='user_add_chatbot'),
+    path('user/<str:user_id>/remove-chatbot/<int:chatbot_id>/', views.user_remove_chatbot, name='user_remove_chatbot'),
 ]

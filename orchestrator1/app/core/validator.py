@@ -30,7 +30,6 @@ def _quick_check(answers: list[dict]) -> tuple[str, str]:
     if not valid:
         return "RETRY", "answers_too_short"
 
-    # Au moins 1 agent fort → PASS immédiat
     for ans in valid:
         agent     = ans.get("agent", "default")
         threshold = CONFIDENCE_THRESHOLDS.get(agent, CONFIDENCE_THRESHOLDS["default"])
@@ -38,7 +37,6 @@ def _quick_check(answers: list[dict]) -> tuple[str, str]:
         if conf >= threshold:
             return "PASS", f"strong_{agent}_{conf:.2f}"
 
-    # Tous faibles mais réponses présentes → on tente quand même
     confidences = [float(a.get("confidence", 0.5)) for a in valid]
     avg = sum(confidences) / len(confidences)
     if avg >= FUSION_CONFIDENCE_MIN:
@@ -47,11 +45,108 @@ def _quick_check(answers: list[dict]) -> tuple[str, str]:
     return "UNCERTAIN", f"low_avg_{avg:.2f}"
 
 
-async def validate(question: str, answers: list[dict], language: str = "fr", session_summary: str | None = None, recent_turns: list[dict] = None) -> tuple[str, str, str]:
+def _build_scope_block(system_prompt: str | None) -> str:
+    """
+    Transforme le system_prompt AdminUI en bloc de contrainte de périmètre.
+
+    AVANT (bug) : bot_identity = system_prompt
+        → Le LLM de synthèse adoptait le rôle 'spécialisé en lubrifiants'
+          et reformulait les données SQL/location pour coller à ce rôle,
+          ignorant les vraies données factuelles des agents.
+
+    APRÈS (fix) : le system_prompt devient une CONTRAINTE de périmètre,
+        pas une identité. Le LLM reste un synthétiseur neutre qui présente
+        les données factuelles des agents, tout en respectant le scope défini.
+    """
+    if not system_prompt or not system_prompt.strip():
+        return ""
+
+    return f"""CHATBOT SCOPE (respect this domain boundary in your answer):
+{system_prompt.strip()}
+
+"""
+
+
+def _build_memory_block(
+    session_summary: str | None,
+    recent_turns:    list[dict] | None,
+) -> str:
+    """Construit le bloc mémoire conversationnelle."""
+    if not session_summary and not recent_turns:
+        return ""
+
+    parts = []
+    if session_summary:
+        parts.append(f"Session summary:\n{session_summary}")
+    if recent_turns:
+        turns_text = "\n".join(
+            f"- User: {t['q']}\n  Assistant: {t['a'][:150]}"
+            for t in (recent_turns or [])[-3:]
+        )
+        parts.append(f"Recent exchanges:\n{turns_text}")
+
+    block = "\n\n".join(parts)
+    return f"""CONVERSATION CONTEXT (use to personalize, resolve references like 'this station', 'that product'):
+{block}
+
+"""
+
+
+async def _translate_if_needed(
+    answer:   str,
+    language: str,
+    agent:    str,
+) -> str:
+    """
+    Traduit la réponse brute d'un agent si la langue ne correspond pas.
+
+    Utilisé uniquement dans le chemin 'PASS direct' (1 seul agent)
+    pour garantir que la réponse est dans la bonne langue même si
+    l'agent a répondu dans une autre.
+    """
+    if not answer or not language or language == "fr":
+        return answer
+
+    try:
+        translated = await generate(
+            LLM_VALIDATOR,
+            f"""Translate the following text to "{language}".
+Return ONLY the translated text, nothing else. No explanation, no preamble.
+
+Text:
+{answer}
+
+Translation in {language}:""",
+            timeout=30,
+        )
+        return translated.strip() if translated.strip() else answer
+    except Exception as e:
+        log.warning("Translation failed — keeping original", agent=agent, error=str(e))
+        return answer
+
+
+async def validate(
+    question:        str,
+    answers:         list[dict],
+    language:        str = "fr",
+    session_summary: str | None = None,
+    recent_turns:    list[dict] = None,
+    system_prompt:   str | None = None,
+) -> tuple[str, str, str]:
     """
     Valide et synthétise les réponses des agents.
+
     Retourne (status, reason, final_answer).
     status = "PASS" | "RETRY" | "CLARIFY"
+
+    Corrections apportées vs version précédente :
+    1. system_prompt injecté comme contrainte de périmètre (scope_block)
+       et non plus comme persona du LLM synthétiseur.
+    2. Codes produits hardcodés supprimés — chaque chatbot a ses propres
+       règles métier dans son system_prompt AdminUI.
+    3. Traduction de la réponse brute si langue différente (chemin PASS direct).
+    4. Instructions au LLM en anglais (plus fiable pour les modèles multilingues),
+       seule la réponse finale est forcée dans la langue cible.
     """
     status, reason = _quick_check(answers)
     successful = [a for a in answers if a.get("_success") and a.get("answer")]
@@ -61,36 +156,23 @@ async def validate(question: str, answers: list[dict], language: str = "fr", ses
         log.info("Validation RETRY (quick check)", reason=reason)
         return "RETRY", reason, ""
 
-    # ── 1 seul agent avec bonne confiance → retour direct SANS LLM ───────────
+    # ── 1 seul agent avec bonne confiance → retour direct ────────────────────
+    # FIX: traduire si la langue de l'agent ≠ langue demandée
     if len(successful) == 1 and status == "PASS":
         agent_answer = successful[0]["answer"]
         agent_name   = successful[0]["agent"]
-        log.info("Validation PASS direct", agent=agent_name)
+        agent_lang   = successful[0].get("language", language)
 
-        # Force le passage par LLM pour traduire les codes produits
-        try:
-            translated = await generate(
-                LLM_VALIDATOR,
-                f"""Réécris la réponse suivante en remplaçant TOUS les codes produits par leurs noms.
+        log.info(
+            "Validation PASS direct",
+            agent=agent_name,
+            answer_preview=agent_answer[:100],
+        )
 
-Règles de traduction OBLIGATOIRES :
-- 11011001 → Gazole B7
-- 11052001 → SP95
-- 11054001 → SP98
-- 11191001 → E10
-- 15011001 → GPL
+        if agent_lang != language and language not in ("fr", "auto"):
+            agent_answer = await _translate_if_needed(agent_answer, language, agent_name)
 
-Réponse originale :
-{agent_answer}
-
-Réponse corrigée (uniquement avec les noms, jamais les codes) :""",
-                timeout=30,
-            )
-            log.info("Traduction codes produits réussie", agent=agent_name)
-            return "PASS", reason, translated
-        except Exception as e:
-            log.warning("Traduction codes échouée, réponse brute", error=str(e))
-            return "PASS", reason, agent_answer
+        return "PASS", reason, agent_answer
 
     # ── Multi-agent : identifier les agents forts ─────────────────────────────
     strong = [
@@ -107,65 +189,40 @@ Réponse corrigée (uniquement avec les noms, jamais les codes) :""",
         status=status,
     )
 
-    # Formater les réponses pour la synthèse
     formatted = "\n\n".join(
         f"[{a.get('agent', '?')}]:\n{a.get('answer', '')}"
         for a in successful
         if a.get("answer")
     )
 
-    memory_block = ""
-    if session_summary:
-        memory_block = f"""CONVERSATION CONTEXT (use this to personalize your answer):
-        {session_summary}
-        """
-    if recent_turns:
-        turns_text = "\n".join(
-            f"- Utilisateur: {t['q']}\n  Assistant: {t['a']}"
-            for t in recent_turns[-3:]   # les 3 derniers suffisent
-        )
-        memory_block += f"\nÉCHANGES RÉCENTS :\n{turns_text}\n"
-
-    if memory_block:
-        memory_block = f"""CONTEXTE DE CONVERSATION (utilise-le pour personnaliser la réponse) :
-{memory_block}
-"""
+    # ── Blocs contextuels ────────────────────────────────────────────────────
+    scope_block  = _build_scope_block(system_prompt)
+    memory_block = _build_memory_block(session_summary, recent_turns)
 
     # ── Synthèse directe si au moins 1 agent fort OU status PASS ─────────────
     if strong or status == "PASS":
         try:
             synthesis = await generate(
                 LLM_VALIDATOR,
-                f"""IMPORTANT: You MUST respond in this language: "{language}"
+                f"""Your task: synthesize factual agent data into a clear, direct answer.
+CRITICAL: Your response language MUST be "{language}". No other language is acceptable.
 
-## RÈGLES IMPORTANTES POUR LES PRODUITS :
-- Ne JAMAIS afficher les codes produits (ex: 11011001)
-- Utilise TOUJOURS les noms des produits :
-  * 11011001 → Gazole B7
-  * 11052001 → SP95
-  * 11054001 → SP98
-  * 11191001 → E10
-  * 15011001 → GPL
+{scope_block}{memory_block}Currency: always Moroccan Dirham (DH or MAD), never euros or dollars.
 
-{memory_block}
-You are an AKWA assistant (Morocco fuel company).
-Currency is always Moroccan Dirham (DH or MAD), never euros or dollars.
-
-Synthesise the following information to answer the question directly.
+SYNTHESIS RULES:
+- Present the agent data FACTUALLY as-is. Do NOT reframe or override it.
+- If the data contains station names, prices, distances — state them exactly.
+- If the context mentions the user's name, use it naturally.
+- Do NOT mention "agents", "sources", "SQL", "RAG", or any technical term.
+- Be concise: 2-5 sentences unless listing items requires more.
+- Respond ONLY in: {language}
 
 Question: {question}
 
-Available information:
+Agent data:
 {formatted}
 
-INSTRUCTIONS:
-- If the conversation context mentions the user's name, use it naturally.
-- Combine all information to answer the question directly.
-- Do NOT mention "agents" or "sources".
-- Your response language MUST be: {language}
-- NEVER show product codes, only product names.
-
-Answer:""",
+Answer in {language}:""",
                 timeout=90,
             )
 
@@ -184,44 +241,30 @@ Answer:""",
             )
             return "PASS", "fallback_concat", fallback
 
-    # ── UNCERTAIN : tenter une synthèse même avec faible confiance ───────────
+    # ── UNCERTAIN : synthèse avec données partielles ──────────────────────────
     if status == "UNCERTAIN":
         try:
             synthesis = await generate(
                 LLM_VALIDATOR,
-                f"""IMPORTANT: You MUST respond in this language: "{language}"
+                f"""Your task: synthesize partial agent data into a useful answer.
+CRITICAL: Your response language MUST be "{language}".
 
-## RÈGLES STRICTES POUR ALLOCARBURANT
+{scope_block}{memory_block}Currency: always Moroccan Dirham (DH or MAD).
 
-1. **Pour lister les stations par ville** : Donne les NOMS COMPLETS des stations.
-   Exemple: "Les stations à Casablanca sont RAHMA et GHANDI."
+SYNTHESIS RULES:
+- Present what is available. If data is partial, say so clearly.
+- For stations: give complete names, not abbreviations.
+- For prices: use the format "X.XX MAD/L".
+- For distances: give name AND distance (e.g. "RAHMA — 6.29 km").
+- Do NOT mention technical terms (agents, SQL, RAG, database).
+- Respond ONLY in: {language}
 
-2. **Pour le nombre de stations** : Indique le nombre ET liste les noms.
-   Exemple: "Il y a 4 stations à Agadir : BAB DOUKKALA, HAY MOHAMMADI, RIAD, YASMINE."
-
-3. **Pour les produits** : Utilise les NOMS, jamais les codes.
-   - 11011001 → Gazole B7
-   - 11052001 → SP95
-   - 11054001 → SP98
-   - 11191001 → E10
-   - 15011001 → GPL
-
-4. **Pour les prix** : Utilise le format "X.XX MAD/L"
-   Exemple: "Le prix du gazole à la station AL AMAL est de 11.01 MAD/L."
-
-5. **Pour la station la plus proche** : Donne le nom ET la distance.
-   Exemple: "La station la plus proche est RAHMA à 6.29 km."
-
-{memory_block}
-           
 Question: {question}
 
-Informations partielles disponibles:
+Partial data available:
 {formatted}
 
-Synthétise ces informations même si incomplètes. Indique ce qui est disponible et ce qui manque si nécessaire.
-Réponds dans la langue: {language}
-N'utilise JAMAIS de codes produits (11011001, 11052001, etc.). Utilise toujours les noms comme indiqué ci-dessus.""",
+Answer in {language}:""",
                 timeout=60,
             )
             log.info("Synthèse UNCERTAIN réussie", answer_length=len(synthesis))
@@ -240,16 +283,17 @@ N'utilise JAMAIS de codes produits (11011001, 11052001, etc.). Utilise toujours 
 
 
 async def ask_clarification(question: str) -> str:
-    """Génère une question de clarification pour l'utilisateur."""
+    """Génère une question de clarification dans la même langue que la question."""
     try:
         return await generate(
             LLM_VALIDATOR,
-            f"""L'utilisateur a posé une question vague à un chatbot AKWA (carburant Maroc).
-Génère UNE question de clarification courte et la même langue que la question de l'utilisateur.
+            f"""The user asked a vague question to a chatbot.
+Generate ONE short clarification question in the SAME LANGUAGE as the user's question.
+Return ONLY the clarification question, no preamble, no explanation.
 
-Question vague: {question}
+User question: {question}
 
-Retourne uniquement la question de clarification, sans autre texte.""",
+Clarification question:""",
             timeout=30,
         )
     except Exception:

@@ -27,6 +27,7 @@ services:
       MAX_RETRIES:         "1"
       REDIS_TTL:           "3600"
       LOG_LEVEL:           "INFO"
+      ADMIN_API_URL: ${ADMIN_API_URL:-http://host.docker.internal:8000}
     networks:
       - akwa_net            # ← même réseau que tous les agents
     depends_on:

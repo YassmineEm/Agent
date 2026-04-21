@@ -7,6 +7,8 @@
     sqlEnabled: {{ form.sql_enabled.value|yesno:'true,false' }},
     ragEnabled: {{ form.rag_enabled.value|yesno:'true,false' }},
     actionEnabled: {{ form.action_enabled.value|yesno:'true,false' }},
+    weatherEnabled: {{ form.weather_enabled.value|yesno:'true,false' }},   
+    locationEnabled: {{ form.location_enabled.value|yesno:'true,false' }},
     rerankerEnabled: {% if rag_form %}{{ rag_form.use_reranker.value|yesno:'true,false' }}{% else %}false{% endif %},
     queryExpansionEnabled: {% if rag_form %}{{ rag_form.use_query_expansion.value|yesno:'true,false' }}{% else %}false{% endif %}
 }">
@@ -158,13 +160,49 @@
                         </label>
                     </div>
                 </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <!-- Enable Weather -->
+                    <div class="flex items-center p-4 border-2 rounded-lg transition-colors cursor-pointer"
+                         :class="weatherEnabled ? 'border-teal-500 bg-teal-50' : 'border-gray-200'"
+                         @click="weatherEnabled = !weatherEnabled">
+                        <input type="checkbox" id="{{ form.weather_enabled.id_for_label }}"
+                               name="{{ form.weather_enabled.html_name }}"
+                               x-model="weatherEnabled"
+                               {% if form.weather_enabled.value %}checked{% endif %}
+                               class="w-4 h-4 text-teal-600 rounded focus:ring-teal-500">
+                        <label for="{{ form.weather_enabled.id_for_label }}" class="ml-3 cursor-pointer">
+                            <div class="flex items-center">
+                                <i class="fas fa-cloud-sun text-teal-600 text-xl mr-2"></i>
+                                <span class="text-sm font-medium text-gray-900">Weather Agent</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Météo, température, pluie, vent</p>
+                        </label>
+                    </div>
+
+                    <!-- Enable Location -->
+                    <div class="flex items-center p-4 border-2 rounded-lg transition-colors cursor-pointer"
+                            :class="locationEnabled ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'"
+                            @click="locationEnabled = !locationEnabled">
+                        <input type="checkbox" id="{{ form.location_enabled.id_for_label }}"
+                                name="{{ form.location_enabled.html_name }}"
+                                x-model="locationEnabled"
+                                {% if form.location_enabled.value %}checked{% endif %}
+                                class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500">
+                        <label for="{{ form.location_enabled.id_for_label }}" class="ml-3 cursor-pointer">
+                            <div class="flex items-center">
+                                <i class="fas fa-map-marker-alt text-emerald-600 text-xl mr-2"></i>
+                                <span class="text-sm font-medium text-gray-900">Location Agent</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Géolocalisation, station la plus proche</p>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- ══════════════════════════════════════════════════════════
              SQL AGENT CONFIGURATION
-             - Mode CREATE : champs custom sql_connection_name[] etc.
-             - Mode EDIT   : Django formset (sql_formset)
         ══════════════════════════════════════════════════════════ -->
         <div x-show="sqlEnabled"
              x-transition:enter="transition ease-out duration-300"
@@ -207,7 +245,7 @@
                     {% if sql_formset %}
                         {{ sql_formset.management_form }}
                         {% for sql_form in sql_formset %}
-                        <div class="border border-gray-300 rounded-lg p-4 bg-gray-50 mb-4">
+                        <div class="border border-gray-300 rounded-lg p-4 bg-gray-50 mb-4 sql-connection-row">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Connection Name</label>
@@ -224,12 +262,63 @@
                                     {{ sql_form.db_type }}
                                     {% if sql_form.db_type.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.db_type.errors.0 }}</p>{% endif %}
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Connection String</label>
-                                    {{ sql_form.connection_string }}
-                                    {% if sql_form.connection_string.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.connection_string.errors.0 }}</p>{% endif %}
+                            </div>
+
+                            <!-- Champs SQLite -->
+                            {% if sql_form.instance.db_type == 'sqlite' %}
+                            <div class="sqlite-fields mt-4">
+                            {% else %}
+                            <div class="sqlite-fields mt-4 hidden">
+                            {% endif %}
+                                <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Chemin du fichier SQLite</label>
+                                    {{ sql_form.sqlite_path }}
+                                    {% if sql_form.sqlite_path.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.sqlite_path.errors.0 }}</p>{% endif %}
                                 </div>
                             </div>
+
+                            <!-- Champs réseau (PostgreSQL, MySQL, MSSQL, Oracle) -->
+                            {% if sql_form.instance.db_type != 'sqlite' and sql_form.instance.db_type %}
+                            <div class="network-fields mt-4">
+                            {% else %}
+                            <div class="network-fields mt-4 hidden">
+                            {% endif %}
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Host</label>
+                                        {{ sql_form.host }}
+                                        {% if sql_form.host.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.host.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Port</label>
+                                        {{ sql_form.port }}
+                                        {% if sql_form.port.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.port.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Database Name</label>
+                                        {{ sql_form.database }}
+                                        {% if sql_form.database.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.database.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                                        {{ sql_form.username }}
+                                        {% if sql_form.username.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.username.errors.0 }}</p>{% endif %}
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                        {{ sql_form.password }}
+                                        {% if sql_form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.password.errors.0 }}</p>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Description de la base -->
+                            <div class="mt-4">
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Description de la base</label>
+                                {{ sql_form.agent_description }}
+                                {% if sql_form.agent_description.errors %}<p class="text-xs text-red-600 mt-1">{{ sql_form.agent_description.errors.0 }}</p>{% endif %}
+                            </div>
+
                             <div class="mt-3 flex items-center justify-between">
                                 <div class="flex items-center">
                                     {{ sql_form.is_active }}
@@ -246,13 +335,38 @@
                             </div>
                             {{ sql_form.id }}
                         </div>
+                        
+                        <!-- Script pour gérer l'affichage conditionnel dynamique -->
+                        <script>
+                            (function() {
+                                var row = document.currentScript.previousElementSibling;
+                                var dbTypeSelect = row.querySelector('select[name$="db_type"]');
+                                var sqliteFields = row.querySelector('.sqlite-fields');
+                                var networkFields = row.querySelector('.network-fields');
+                                
+                                function updateFields() {
+                                    if (dbTypeSelect.value === 'sqlite') {
+                                        sqliteFields.classList.remove('hidden');
+                                        networkFields.classList.add('hidden');
+                                    } else if (dbTypeSelect.value !== '') {
+                                        sqliteFields.classList.add('hidden');
+                                        networkFields.classList.remove('hidden');
+                                    } else {
+                                        sqliteFields.classList.add('hidden');
+                                        networkFields.classList.add('hidden');
+                                    }
+                                }
+                                
+                                dbTypeSelect.addEventListener('change', updateFields);
+                                updateFields();
+                            })();
+                        </script>
                         {% endfor %}
                     {% endif %}
                     {% endif %}
-
                 </div>
 
-                <!-- Bouton Ajouter une connexion (HTMX, fonctionne dans les deux modes) -->
+                <!-- Bouton Ajouter une connexion (HTMX) -->
                 <button type="button"
                         hx-get="{% url 'dashboard:add_sql_row' %}"
                         hx-target="#sql-connections-container"
@@ -309,6 +423,25 @@
                         <i class="fas fa-info-circle text-blue-600 mr-1"></i>
                         Document will be uploaded and indexed when you create the chatbot
                     </div>
+                </div>
+
+                <!-- Description du RAG pour le routeur IA -->
+                <div class="border border-purple-200 rounded-lg p-4 bg-purple-50">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <span class="text-purple-600">Description du RAG</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mb-2">
+                        Décris les documents indexés. Cette description aide à choisir le bon agent.
+                    </p>
+                    {% if rag_form %}
+                        {{ rag_form.agent_description }}
+                    {% else %}
+                        <textarea
+                            name="rag_agent_description"
+                            rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                            placeholder="Ex: Fiches techniques huiles moteur (Qualix, Havoline, Delo), normes API/ACEA, spécifications viscosité et guides d'utilisation..."></textarea>
+                    {% endif %}
                 </div>
 
                 {% if rag_form %}

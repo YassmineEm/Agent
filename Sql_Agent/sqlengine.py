@@ -22,7 +22,13 @@ Output STRICT JSON only:
 
 DATABASE SCHEMA
 ==========================
-{SCHEMA_TEXT}"""),
+{SCHEMA_TEXT}
+
+ADMIN RULES (PRIORITY — follow these exactly)
+==========================
+{ADMIN_RULES}
+
+Output STRICT JSON only: {{"sql": "<valid_sql_query>"}}"""),
     ("human", "{query}")
 ])
 
@@ -149,7 +155,8 @@ def run_sql_generation(
     model,
     allowed_db_ids: list,
     db_cache:       dict,
-    language:       str = "fr",      # ← AJOUTÉ
+    language:       str = "fr",      
+    admin_rules=""
 ) -> dict:
     """
     Pipeline complet : routing → SQL generation → execution → natural answer.
@@ -198,7 +205,7 @@ def run_sql_generation(
 
     # ── 2. Génération SQL ─────────────────────────────────────────────────────
     db_meta = db_cache[selected_id]
-    sql_chain = SQL_PROMPT.partial(SCHEMA_TEXT=db_meta["schema"]) | model | parser
+    sql_chain = SQL_PROMPT.partial(SCHEMA_TEXT=db_meta["schema"], ADMIN_RULES=admin_rules if admin_rules else "Aucune règle spécifique.") | model | parser
     response = sql_chain.invoke({"query": query})
 
     sql = response.get("sql")

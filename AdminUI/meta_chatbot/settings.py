@@ -7,10 +7,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / ".env")
 
+SUPABASE_PROJECT_ID = env("VITE_SUPABASE_PROJECT_ID", default="nggndpmbclssomtmrofs")
+SUPABASE_URL = env("VITE_SUPABASE_URL", default="https://nggndpmbclssomtmrofs.supabase.co")
+SUPABASE_PUBLISHABLE_KEY = env("VITE_SUPABASE_PUBLISHABLE_KEY", default="")
+
+
+SUPABASE_SERVICE_KEY = env("SUPABASE_SERVICE_KEY", default="")
+if not SUPABASE_SERVICE_KEY:
+    print("⚠️ ATTENTION: SUPABASE_SERVICE_KEY n'est pas définie dans .env")
+    print("   Le service Supabase ne pourra pas fonctionner correctement.")
+
 SQL_AGENT_BASE_URL = env("SQL_AGENT_BASE_URL", default="http://localhost:8006")
 RAG_AGENT_BASE_URL = env("RAG_AGENT_BASE_URL", default="http://localhost:8005")
 RAG_AGENT_ADMIN_API_KEY = env("akwa_admin_secret_2025", default="")
-MICROSERVICE_TIMEOUT_SECONDS = env.int("MICROSERVICE_TIMEOUT_SECONDS", default=30)
+MICROSERVICE_TIMEOUT_SECONDS = env.int("MICROSERVICE_TIMEOUT_SECONDS", default=90)
 SECRET_KEY = 'django-insecure-your-secret-key-here-change-in-production'
 
 DEBUG = True
@@ -33,6 +43,8 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_tailwind',
     'corsheaders',
+
+    'django_htmx', 
     
     # Local apps
     'dashboard',
@@ -47,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
 ]
 
 ROOT_URLCONF = 'meta_chatbot.urls'
@@ -99,7 +112,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
