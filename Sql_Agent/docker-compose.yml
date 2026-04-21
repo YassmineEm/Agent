@@ -1,19 +1,36 @@
 version: "3.9"
 
 services:
+  # --- New Redis Service for SQL Agent ---
+  sql_redis:
+    image: redis:alpine
+    container_name: akwa_sql_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes  # Ensures data persistence (AOF)
+    ports:
+      - "6381:6379"  # Maps internal 6379 to Host 6381 (since 6379/6380 are taken)
+    volumes:
+      - sql_redis_data:/data
+    networks:
+      - akwa_net
 
+  # --- Existing SQL Agent Service ---
   sql_agent:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: akwa_sql_agent
     restart: unless-stopped
+    depends_on:
+      - sql_redis
     ports:
       - "8006:8006"           
     environment:
       API_PORT:        "8006"
-      ADMIN_API_URL: "http://host.docker.internal:8000"
-      # Variables de connexion à ta base PostgreSQL/MySQL
+      ADMIN_API_URL:   "http://host.docker.internal:8000"
+      # REDIS CONNECTION: Use the service name defined above
+      REDIS_HOST:      "sql_redis"
+      REDIS_PORT:      "6379"
       DB_HOST:         ${DB_HOST:-host.docker.internal}
       DB_PORT:         ${DB_PORT:-5432}
       DB_NAME:         ${DB_NAME:-akwa_db}
@@ -24,18 +41,19 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  
     volumes:
-      # AJOUTER CETTE LIGNE - Monte le dossier database contenant carburant.db
-      - ./database:/app/database # accès à la BDD sur la machine hôte
+      - ./database:/app/database
     networks:
-      - akwa_net              # ← réseau partagé, visible par l'orchestrateur
+      - akwa_net
     healthcheck:
-      test: ["CMD", "python", "-c",
-            "import httpx; r=httpx.get('http://localhost:8006/health', timeout=5); r.raise_for_status()"]
+      test: ["CMD", "python", "-c", "import httpx; r=httpx.get('http://localhost:8006/health', timeout=5); r.raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
 
+volumes:
+  sql_redis_data:  # Named volume for database persistence
+
 networks:
   akwa_net:
-    external: true            # réseau partagé
+    external: true

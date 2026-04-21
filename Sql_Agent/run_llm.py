@@ -1,30 +1,38 @@
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.messages import HumanMessage
 
-GROQ_API_KEY = "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"
+# Configuration for your Ollama Server
+OLLAMA_BASE_URL = "https://ollama.mydigiapps.com/v1" # Note the /v1 for OpenAI compatibility
+HEADERS = {
+    "CF-Access-Client-Id": "2c8ae98fc22cfe99e9fcc87fc7fab058.access",
+    "CF-Access-Client-Secret": "4093f9711287f919fd0855a4f9d383bcdceda22599751fe1e32de33df1a207a7"
+}
 
-
-def get_local_llm(model_name="llama-3.3-70b-versatile"):
+def get_local_llm(model_name="qwen3:8b"):
     """
-    Groq — rapide, gratuit, fiable pour Text-to-SQL.
-    Modèles disponibles :
-    - llama-3.3-70b-versatile   ← meilleur pour SQL
-    - llama-3.1-8b-instant      ← plus rapide, moins précis
-    - mixtral-8x7b-32768        ← bon pour JSON structuré
+    Switched to Ollama via OpenAI-compatible endpoint.
+    Keeps the JSON structure requirement.
     """
-    return ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=model_name,
+    return ChatOpenAI(
+        base_url=OLLAMA_BASE_URL,
+        api_key="ollama",
+        model=model_name,
         temperature=0,
+        default_headers=HEADERS,
         model_kwargs={"response_format": {"type": "json_object"}}
     )
 
 parser = JsonOutputParser()
 
-def get_local_llm_text(model_name="llama-3.3-70b-versatile"):
-    return ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=model_name,
+def get_local_llm_text(model_name="qwen3:8b"):
+    """
+    Switched to Ollama for general text generation.
+    """
+    return ChatOpenAI(
+        base_url=OLLAMA_BASE_URL,
+        api_key="ollama",
+        model=model_name,
         temperature=0.3,
-        # Pas de response_format JSON
+        default_headers=HEADERS
     )

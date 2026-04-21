@@ -10,3 +10,4 @@ langchain-openai
 pydantic
 python-dotenv
 psycopg2-binary>=2.9.0
+langchain_ollama

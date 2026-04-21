@@ -22,13 +22,7 @@ Output STRICT JSON only:
 
 DATABASE SCHEMA
 ==========================
-{SCHEMA_TEXT}
-
-ADMIN RULES (PRIORITY — follow these exactly)
-==========================
-{ADMIN_RULES}
-
-Output STRICT JSON only: {{"sql": "<valid_sql_query>"}}"""),
+{SCHEMA_TEXT}"""),
     ("human", "{query}")
 ])
 
@@ -151,31 +145,22 @@ def _format_as_natural_response(query, raw_result, model, language="fr"):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def run_sql_generation(
-    query:          str,
+    query: str,
     model,
     allowed_db_ids: list,
-    db_cache:       dict,
-    language:       str = "fr",      
-    admin_rules=""
+    db_cache: dict,
 ) -> dict:
-    """
-    Pipeline complet : routing → SQL generation → execution → natural answer.
-    """
-    # ── 1. Routing ────────────────────────────────────────────────────────────
+    # -- 1. Routing --
     db_options = "\n\n".join([
         f"- ID: {id}\n  Name: {db_cache[id]['db_name']}\n  Schema: {db_cache[id]['schema']}"
-        for id in allowed_db_ids
-        if id in db_cache
+        for id in allowed_db_ids if id in db_cache
     ])
 
     router_chain = ROUTER_PROMPT | model | parser
-    routing = router_chain.invoke({
-        "DATABASE_NAMES": db_options,
-        "query": query,
-    })
+    routing = router_chain.invoke({"DATABASE_NAMES": db_options, "query": query})
     selected_id = routing.get("database")
 
-    # ── Garde-fou routing (fuzzy fallback) ───────────────────────────────────
+    # -- Fallback Routing --
     if selected_id not in allowed_db_ids:
         query_lower = query.lower()
         for db_id in allowed_db_ids:
@@ -186,65 +171,28 @@ def run_sql_generation(
                     break
             if selected_id in allowed_db_ids:
                 break
-
     if selected_id not in allowed_db_ids:
-        # Message d'erreur dans la langue demandée
-        if language in ("ar", "arabe", "arabic"):
-            error_msg = "لا يمكنني تحديد قاعدة البيانات المناسبة."
-        elif language in ("en", "anglais", "english"):
-            error_msg = "I cannot determine which database to use."
-        else:
-            error_msg = "Je ne peux pas déterminer quelle base de données utiliser."
-        return {
-            "answer":     error_msg,
-            "rows":       [],
-            "confidence": 0.0,
-            "error":      "routing_failed",
-            "sql":        None,
-        }
+        return {"rows": [], "error": "routing_failed", "sql": None}
 
     # ── 2. Génération SQL ─────────────────────────────────────────────────────
     db_meta = db_cache[selected_id]
-    sql_chain = SQL_PROMPT.partial(SCHEMA_TEXT=db_meta["schema"], ADMIN_RULES=admin_rules if admin_rules else "Aucune règle spécifique.") | model | parser
+    sql_chain = SQL_PROMPT.partial(SCHEMA_TEXT=db_meta["schema"]) | model | parser
     response = sql_chain.invoke({"query": query})
 
     sql = response.get("sql")
-    error = response.get("error")
 
-    # ── 3. Hors périmètre ────────────────────────────────────────────────────
-    if error == "cannot_answer" or not sql:
-        if language in ("ar", "arabe", "arabic"):
-            no_answer = "لا يمكنني الإجابة على هذا السؤال بالبيانات المتاحة."
-        elif language in ("en", "anglais", "english"):
-            no_answer = "I cannot answer this question with the available data."
-        else:
-            no_answer = "Je ne peux pas répondre à cette question avec les données disponibles."
-        return {
-            "answer":     no_answer,
-            "rows":       [],
-            "confidence": 0.0,
-            "error":      error or "no_sql_generated",
-            "sql":        None,
-        }
+    if response.get("error") == "cannot_answer" or not sql:
+        return {"rows": [], "error": response.get("error") or "no_sql_generated", "sql": sql}
 
-    # ── 4. Exécution du SQL (résultat brut + rows_json) ──────────────────────
-    raw_result, rows_json = execute_sql(db_meta["uri"], sql)
+    # -- 3. Execution --
+    # We ignore raw_result (string) and return rows_json (list of dicts)
+    _, rows_json = execute_sql(db_meta["uri"], sql)
 
-    # ── 5. Génération d'une réponse naturelle dans la langue cible ───────────
-    natural_answer = _format_as_natural_response(
-        query=query,
-        raw_result=raw_result,
-        model=model,
-        language=language,
-    )
-
-    # ── 6. Retour final (avec rows pour le location agent) ───────────────────
+    # -- 4. Final Return (Raw Data) --
     return {
-        "answer":      natural_answer,          # ← réponse naturelle, pas tableau brut
-        "rows":        rows_json,               # ← liste de dicts pour location agent
-        "confidence":  0.85,
+        "rows": rows_json,
         "selected_db": selected_id,
-        "db_name":     db_meta["db_name"],
-        "sql":         sql,
-        "error":       None,
+        "db_name": db_meta["db_name"],
+        "sql": sql,
+        "error": None,
     }

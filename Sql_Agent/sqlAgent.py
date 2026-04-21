@@ -2,6 +2,8 @@ import logging
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import redis 
+import json 
 import httpx
 import asyncio
 import os
@@ -14,6 +16,8 @@ from sqlengine import run_sql_generation
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+r = redis.Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, db=0, decode_responses=True)
 app = FastAPI(title="Text2SQL Multi-Agent Service")
 
 # --- GLOBAL CACHE STORES ---
@@ -29,6 +33,13 @@ def get_model(model_name: str):
     if model_name not in model_registry:
         model_registry[model_name] = get_local_llm(model_name)
     return model_registry[model_name]
+
+def save_to_redis(key_prefix: str, item_id: str, data: dict):
+    r.set(f"{key_prefix}:{item_id}", json.dumps(data))
+
+def get_from_redis(key_prefix: str, item_id: str):
+    data = r.get(f"{key_prefix}:{item_id}")
+    return json.loads(data) if data else None
 
 # --- DATA MODELS ---
 class DBUpdate(BaseModel):
@@ -57,43 +68,71 @@ async def health():
 async def sync_database(data: DBUpdate):
     try:
         schema = extract_schema(data.connection_uri)
-        db_cache[data.db_id] = {
+        db_obj = {
             "id":      data.db_id,
             "uri":     data.connection_uri,
             "db_name": data.db_name,
             "schema":  schema,
         }
+        save_to_redis("db", data.db_id, db_obj)
         return {"status": "success", "message": f"Database {data.db_id} synced."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/databases")
 async def get_all_databases():
-    return [{"db_id": k, "db_name": v["db_name"]} for k, v in db_cache.items()]
+    # Fetch all keys starting with 'db:'
+    keys = r.keys("db:*")
+    databases = []
+    for k in keys:
+        v = json.loads(r.get(k))
+        databases.append({"db_id": v["id"], "db_name": v["db_name"]})
+    return databases
 
 @app.get("/chatbots")
 async def get_all_chatbots():
-    return [
-        {"chatbot_id": k, "model_name": v["model_name"], "db_ids": v["db_ids"]}
-        for k, v in chatbot_cache.items()
-    ]
+    keys = r.keys("chatbot:*")
+    chatbots = []
+    for k in keys:
+        v = json.loads(r.get(k))
+        # Extract ID from key 'chatbot:ID'
+        chatbot_id = k.split(":")[1]
+        chatbots.append({
+            "chatbot_id": chatbot_id, 
+            "model_name": v["model_name"], 
+            "db_ids": v["db_ids"]
+        })
+    return chatbots
 
 @app.post("/sync/chatbot")
 async def sync_chatbot(data: ChatbotUpdate):
     newly_synced_dbs = []
     for db_info in data.databases:
-        if db_info.db_id not in db_cache:
+        # Check Redis instead of local dict
+        if not r.exists(f"db:{db_info.db_id}"):
             schema = extract_schema(db_info.connection_uri)
-            db_cache[db_info.db_id] = {
+            db_obj = {
+                "id":      db_info.db_id,
                 "db_name": db_info.db_name,
                 "schema":  schema,
                 "uri":     db_info.connection_uri,
             }
+            r.set(f"db:{db_info.db_id}", json.dumps(db_obj))
             newly_synced_dbs.append(db_info.db_id)
-    chatbot_cache[data.chatbot_id] = {
+            
+    chatbot_obj = {
         "model_name": data.model_name,
         "db_ids":     [db.db_id for db in data.databases],
     }
+    r.set(f"chatbot:{data.chatbot_id}", json.dumps(chatbot_obj))
+    
+    # Trigger RDB snapshot to persist changes immediately
+    try:
+        r.bgsave()
+    except redis.exceptions.ResponseError:
+        pass 
+
     get_model(data.model_name)
     return {
         "status": "success",
@@ -103,107 +142,63 @@ async def sync_chatbot(data: ChatbotUpdate):
     }
 
 # --- QUERY ENDPOINTS ---
-@app.get("/query")
-async def handle_query_get(chatbot_id: str, user_question: str):
-    bot_config = chatbot_cache.get(chatbot_id)
-    if not bot_config:
-        raise HTTPException(status_code=404, detail="Bot not found")
-    model = model_registry.get(bot_config["model_name"])
-    if not model:
-        raise HTTPException(status_code=404, detail="Model not initialized")
+@app.post("/query")
+async def handle_query(req: QueryRequest):
+    # 1. Fetch config from Redis (Source of Truth)
+    raw_config = r.get(f"chatbot:{req.chatbot_id}")
+    if not raw_config:
+        raise HTTPException(status_code=404, detail="Chatbot config not found in Redis")
+    
+    bot_config = json.loads(raw_config)
+    
+    # 2. Lazy-load model if not in registry
+    model = get_model(bot_config["model_name"])
+
+    # 3. Build DB cache from Redis
+    active_db_cache = {}
+    for db_id in bot_config["db_ids"]:
+        db_data = r.get(f"db:{db_id}")
+        if db_data:
+            active_db_cache[db_id] = json.loads(db_data)
+
+    # 4. Run SQL Generation (Now returns raw data/JSON)
     result = run_sql_generation(
-        query=user_question,
+        query=req.question,
         model=model,
         allowed_db_ids=bot_config["db_ids"],
-        db_cache=db_cache,
-    )
-    return result
-
-@app.post("/query")
-async def handle_query_post(req: QueryRequest):
-    bot_config = chatbot_cache.get(req.chatbot_id)
-    if not bot_config:
-        raise HTTPException(status_code=404, detail="Bot not found")
-
-    model = model_registry.get(bot_config["model_name"])
-    if not model:
-        raise HTTPException(status_code=404, detail="Model not initialized")
-
-    result = run_sql_generation(
-        query          = req.question,
-        model          = model,
-        allowed_db_ids = bot_config["db_ids"],
-        db_cache       = db_cache,
-        language       = req.language,    
-        admin_rules    = req.admin_rules,  
+        db_cache=active_db_cache
     )
 
     return {
-        "answer":     result.get("answer", "Aucune réponse disponible."),
-        "confidence": result.get("confidence", 0.0),
-        "agent":      "sql",
+        "status": "success" if not result.get("error") else "error",
+        "data": result.get("rows", []),
         "metadata": {
             "selected_db": result.get("selected_db"),
-            "db_name":     result.get("db_name"),
-            "sql":         result.get("sql"),
-            "rows":        result.get("rows", []),
-            "error":       result.get("error"),
+            "db_name": result.get("db_name"),
+            "sql": result.get("sql"),
+            "error": result.get("error")
         }
     }
 
-# --- SYNCHRONISATION INITIALE AVEC L'ADMINUI ---
-async def fetch_and_sync_all_chatbots():
-    """
-    Interroge l'AdminUI et synchronise uniquement les chatbots
-    avec sql_enabled=True et au moins une DB active.
-    """
-    url = f"{ADMIN_API_URL}/api/chatbots/sql/"
-    
-    for attempt in range(1, 6):  # 5 tentatives
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                logger.info(f"[Tentative {attempt}/5] Chargement depuis {url}")
-                resp = await client.get(url)
-                resp.raise_for_status()
-                data = resp.json()
-
-            chatbots_list = data.get("chatbots", [])
-            logger.info(f"✅ {len(chatbots_list)} chatbot(s) SQL trouvés dans AdminUI")
-
-            for bot in chatbots_list:
-                try:
-                    payload = ChatbotUpdate(
-                        chatbot_id=bot["chatbot_id"],
-                        model_name=bot["model_name"],
-                        databases=[
-                            DBUpdate(
-                                db_id=db["db_id"],
-                                db_name=db["db_name"],
-                                connection_uri=db["connection_uri"],
-                            )
-                            for db in bot["databases"]
-                        ]
-                    )
-                    await sync_chatbot(payload)
-                    logger.info(f"  ✔ Chatbot '{bot['chatbot_name']}' synchronisé ({len(bot['databases'])} DB)")
-                except Exception as e:
-                    logger.error(f"  ✘ Erreur sync chatbot '{bot.get('chatbot_name')}': {e}")
-
-            return  # succès → on sort
-
-        except Exception as e:
-            logger.warning(f"[Tentative {attempt}/5] AdminUI inaccessible: {e}")
-            if attempt < 5:
-                await asyncio.sleep(5)
-
-    logger.error("❌ AdminUI inaccessible après 5 tentatives. Démarrage sans chatbots.")
 
 @app.on_event("startup")
 async def startup_event():
-    """Au démarrage, tente de synchroniser tous les chatbots depuis l'AdminUI."""
-    # Laisser un peu de temps au réseau pour démarrer
-    await asyncio.sleep(5)
-    await fetch_and_sync_all_chatbots()
+    """Restore state from Redis and initialize models."""
+    logger.info("🔄 Restoring state from Redis...")
+    chatbot_keys = r.keys("chatbot:*")
+    
+    for key in chatbot_keys:
+        try:
+            bot_data = json.loads(r.get(key))
+            model_name = bot_data.get("model_name")
+            if model_name:
+                # Pre-warm the model in the registry
+                get_model(model_name)
+                logger.info(f"✅ Model {model_name} initialized for {key}")
+        except Exception as e:
+            logger.error(f"❌ Failed to restore {key}: {e}")
+    
+    logger.info(f"🚀 SQL Engine Ready. {len(chatbot_keys)} chatbots loaded.")
 
 @app.delete("/sync/chatbot/{chatbot_id}")
 async def delete_chatbot(chatbot_id: str):
