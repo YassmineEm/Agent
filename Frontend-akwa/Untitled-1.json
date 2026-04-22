@@ -1,0 +1,1459 @@
+{
+	"knownSymbols": {
+		"defineConfig": [
+			{
+				"name": "defineConfig",
+				"module": "vite",
+				"isDefault": false
+			},
+			{
+				"name": "defineConfig",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\vite.config.ts",
+				"isDefault": true
+			},
+			{
+				"name": "defineConfig",
+				"module": "vitest/config",
+				"isDefault": false
+			}
+		],
+		"react": [
+			{
+				"name": "react",
+				"module": "@vitejs/plugin-react-swc",
+				"isDefault": true
+			}
+		],
+		"path": [
+			{
+				"name": "path",
+				"module": "path",
+				"isDefault": true
+			}
+		],
+		"componentTagger": [
+			{
+				"name": "componentTagger",
+				"module": "lovable-tagger",
+				"isDefault": false
+			}
+		],
+		"default": [
+			{
+				"name": "default",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\tailwind.config.ts",
+				"isDefault": false
+			}
+		],
+		"type { Config": [
+			{
+				"name": "type { Config",
+				"module": "tailwindcss",
+				"isDefault": true
+			}
+		],
+		"describe": [
+			{
+				"name": "describe",
+				"module": "vitest",
+				"isDefault": false
+			}
+		],
+		"it": [
+			{
+				"name": "it",
+				"module": "vitest",
+				"isDefault": false
+			}
+		],
+		"expect": [
+			{
+				"name": "expect",
+				"module": "vitest",
+				"isDefault": false
+			}
+		],
+		"useChatStore": [
+			{
+				"name": "useChatStore",
+				"module": "@/stores/chatStore",
+				"isDefault": false
+			},
+			{
+				"name": "useChatStore",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\stores\\chatStore.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"create": [
+			{
+				"name": "create",
+				"module": "zustand",
+				"isDefault": false
+			}
+		],
+		"fetchChatbots": [
+			{
+				"name": "fetchChatbots",
+				"module": "@/services/api",
+				"isDefault": false
+			},
+			{
+				"name": "fetchChatbots",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\services\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"cn": [
+			{
+				"name": "cn",
+				"module": "@/lib/utils",
+				"isDefault": false
+			},
+			{
+				"name": "cn",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\lib\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"clsx": [
+			{
+				"name": "clsx",
+				"module": "clsx",
+				"isDefault": false
+			}
+		],
+		"type ClassValue": [
+			{
+				"name": "type ClassValue",
+				"module": "clsx",
+				"isDefault": false
+			}
+		],
+		"twMerge": [
+			{
+				"name": "twMerge",
+				"module": "tailwind-merge",
+				"isDefault": false
+			}
+		],
+		"sendMessage": [
+			{
+				"name": "sendMessage",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\services\\api.ts",
+				"type": "const",
+				"isDefault": false
+			},
+			{
+				"name": "sendMessage",
+				"module": "@/services/api",
+				"isDefault": false
+			}
+		],
+		"AfriquiaLogo": [
+			{
+				"name": "AfriquiaLogo",
+				"module": "@/components/AfriquiaLogo",
+				"isDefault": true
+			},
+			{
+				"name": "AfriquiaLogo",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\AfriquiaLogo.tsx",
+				"isDefault": true
+			}
+		],
+		"afriquiaLogo": [
+			{
+				"name": "afriquiaLogo",
+				"module": "@/assets/afriquia-logo.png",
+				"isDefault": true
+			}
+		],
+		"reducer": [
+			{
+				"name": "reducer",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\use-toast.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"React": [
+			{
+				"name": "React",
+				"module": "react",
+				"isDefault": true,
+				"asDefinition": "* as React"
+			}
+		],
+		"type { ToastActionElement": [
+			{
+				"name": "type { ToastActionElement",
+				"module": "@/components/ui/toast",
+				"isDefault": true
+			}
+		],
+		"ToastProps": [
+			{
+				"name": "ToastProps",
+				"module": "@/components/ui/toast",
+				"isDefault": true
+			}
+		],
+		"GeolocationResult": [
+			{
+				"name": "GeolocationResult",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\useGeolocation.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"getGeolocation": [
+			{
+				"name": "getGeolocation",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\useGeolocation.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"AuthProvider": [
+			{
+				"name": "AuthProvider",
+				"module": "@/hooks/useAuth",
+				"isDefault": false
+			},
+			{
+				"name": "AuthProvider",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\useAuth.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"useAuth": [
+			{
+				"name": "useAuth",
+				"module": "@/hooks/useAuth",
+				"isDefault": false
+			},
+			{
+				"name": "useAuth",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\useAuth.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"useState": [
+			{
+				"name": "useState",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"createContext": [
+			{
+				"name": "createContext",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"useContext": [
+			{
+				"name": "useContext",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"ReactNode": [
+			{
+				"name": "ReactNode",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"createRoot": [
+			{
+				"name": "createRoot",
+				"module": "react-dom/client",
+				"isDefault": false
+			}
+		],
+		"Auth": [
+			{
+				"name": "Auth",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\pages\\Auth.tsx",
+				"isDefault": true
+			}
+		],
+		"useNavigate": [
+			{
+				"name": "useNavigate",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"Button": [
+			{
+				"name": "Button",
+				"module": "@/components/ui/button",
+				"isDefault": false
+			}
+		],
+		"Input": [
+			{
+				"name": "Input",
+				"module": "@/components/ui/input",
+				"isDefault": false
+			}
+		],
+		"Label": [
+			{
+				"name": "Label",
+				"module": "@/components/ui/label",
+				"isDefault": false
+			}
+		],
+		"toast": [
+			{
+				"name": "toast",
+				"module": "sonner",
+				"isDefault": false
+			},
+			{
+				"name": "toast",
+				"module": "@/hooks/use-toast",
+				"isDefault": false
+			}
+		],
+		"LogIn": [
+			{
+				"name": "LogIn",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"UserPlus": [
+			{
+				"name": "UserPlus",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ArrowLeft": [
+			{
+				"name": "ArrowLeft",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"useEffect": [
+			{
+				"name": "useEffect",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"Toaster": [
+			{
+				"name": "Toaster",
+				"module": "@/components/ui/toaster",
+				"isDefault": false
+			},
+			{
+				"name": "Toaster",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\toaster.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"Toaster as Sonner": [
+			{
+				"name": "Toaster as Sonner",
+				"module": "@/components/ui/sonner",
+				"isDefault": false
+			},
+			{
+				"name": "Toaster as Sonner",
+				"module": "sonner",
+				"isDefault": false
+			}
+		],
+		"TooltipProvider": [
+			{
+				"name": "TooltipProvider",
+				"module": "@/components/ui/tooltip",
+				"isDefault": false
+			}
+		],
+		"QueryClient": [
+			{
+				"name": "QueryClient",
+				"module": "@tanstack/react-query",
+				"isDefault": false
+			}
+		],
+		"QueryClientProvider": [
+			{
+				"name": "QueryClientProvider",
+				"module": "@tanstack/react-query",
+				"isDefault": false
+			}
+		],
+		"BrowserRouter": [
+			{
+				"name": "BrowserRouter",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"Routes": [
+			{
+				"name": "Routes",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"Route": [
+			{
+				"name": "Route",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"Navigate": [
+			{
+				"name": "Navigate",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"useIsMobile": [
+			{
+				"name": "useIsMobile",
+				"module": "@/hooks/use-mobile",
+				"isDefault": false
+			},
+			{
+				"name": "useIsMobile",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\hooks\\use-mobile.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"NotFound": [
+			{
+				"name": "NotFound",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\pages\\NotFound.tsx",
+				"isDefault": true
+			}
+		],
+		"useLocation": [
+			{
+				"name": "useLocation",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"Index": [
+			{
+				"name": "Index",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\pages\\Index.tsx",
+				"isDefault": true
+			}
+		],
+		"History": [
+			{
+				"name": "History",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\pages\\History.tsx",
+				"isDefault": true
+			}
+		],
+		"Search": [
+			{
+				"name": "Search",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Calendar": [
+			{
+				"name": "Calendar",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Filter": [
+			{
+				"name": "Filter",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"MessageSquare": [
+			{
+				"name": "MessageSquare",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"format": [
+			{
+				"name": "format",
+				"module": "date-fns",
+				"isDefault": false
+			}
+		],
+		"fr": [
+			{
+				"name": "fr",
+				"module": "date-fns/locale",
+				"isDefault": false
+			}
+		],
+		"Chat": [
+			{
+				"name": "Chat",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\pages\\Chat.tsx",
+				"isDefault": true
+			}
+		],
+		"ChatSidebar": [
+			{
+				"name": "ChatSidebar",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\chat\\ChatSidebar.tsx",
+				"isDefault": true
+			},
+			{
+				"name": "ChatSidebar",
+				"module": "@/components/chat/ChatSidebar",
+				"isDefault": true
+			}
+		],
+		"ChatArea": [
+			{
+				"name": "ChatArea",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\chat\\ChatArea.tsx",
+				"isDefault": true
+			},
+			{
+				"name": "ChatArea",
+				"module": "@/components/chat/ChatArea",
+				"isDefault": true
+			}
+		],
+		"NavLink as RouterNavLink": [
+			{
+				"name": "NavLink as RouterNavLink",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"NavLinkProps": [
+			{
+				"name": "NavLinkProps",
+				"module": "react-router-dom",
+				"isDefault": false
+			}
+		],
+		"forwardRef": [
+			{
+				"name": "forwardRef",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"AspectRatioPrimitive": [
+			{
+				"name": "AspectRatioPrimitive",
+				"module": "@radix-ui/react-aspect-ratio",
+				"isDefault": true,
+				"asDefinition": "* as AspectRatioPrimitive"
+			}
+		],
+		"cva": [
+			{
+				"name": "cva",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"type VariantProps": [
+			{
+				"name": "type VariantProps",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"AlertDialogPrimitive": [
+			{
+				"name": "AlertDialogPrimitive",
+				"module": "@radix-ui/react-alert-dialog",
+				"isDefault": true,
+				"asDefinition": "* as AlertDialogPrimitive"
+			}
+		],
+		"buttonVariants": [
+			{
+				"name": "buttonVariants",
+				"module": "@/components/ui/button",
+				"isDefault": false
+			}
+		],
+		"AccordionPrimitive": [
+			{
+				"name": "AccordionPrimitive",
+				"module": "@radix-ui/react-accordion",
+				"isDefault": true,
+				"asDefinition": "* as AccordionPrimitive"
+			}
+		],
+		"ChevronDown": [
+			{
+				"name": "ChevronDown",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ButtonProps": [
+			{
+				"name": "ButtonProps",
+				"module": "@/components/ui/button",
+				"isDefault": false
+			},
+			{
+				"name": "ButtonProps",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\button.tsx",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Slot": [
+			{
+				"name": "Slot",
+				"module": "@radix-ui/react-slot",
+				"isDefault": false
+			}
+		],
+		"ChevronRight": [
+			{
+				"name": "ChevronRight",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"MoreHorizontal": [
+			{
+				"name": "MoreHorizontal",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"BadgeProps": [
+			{
+				"name": "BadgeProps",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\badge.tsx",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"AvatarPrimitive": [
+			{
+				"name": "AvatarPrimitive",
+				"module": "@radix-ui/react-avatar",
+				"isDefault": true,
+				"asDefinition": "* as AvatarPrimitive"
+			}
+		],
+		"CalendarProps": [
+			{
+				"name": "CalendarProps",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\calendar.tsx",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"ChevronLeft": [
+			{
+				"name": "ChevronLeft",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"DayPicker": [
+			{
+				"name": "DayPicker",
+				"module": "react-day-picker",
+				"isDefault": false
+			}
+		],
+		"CheckboxPrimitive": [
+			{
+				"name": "CheckboxPrimitive",
+				"module": "@radix-ui/react-checkbox",
+				"isDefault": true,
+				"asDefinition": "* as CheckboxPrimitive"
+			}
+		],
+		"Check": [
+			{
+				"name": "Check",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ChartConfig": [
+			{
+				"name": "ChartConfig",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\chart.tsx",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"RechartsPrimitive": [
+			{
+				"name": "RechartsPrimitive",
+				"module": "recharts",
+				"isDefault": true,
+				"asDefinition": "* as RechartsPrimitive"
+			}
+		],
+		"useEmblaCarousel": [
+			{
+				"name": "useEmblaCarousel",
+				"module": "embla-carousel-react",
+				"isDefault": true
+			}
+		],
+		"{ type UseEmblaCarouselType": [
+			{
+				"name": "{ type UseEmblaCarouselType",
+				"module": "embla-carousel-react",
+				"isDefault": true
+			}
+		],
+		"ArrowRight": [
+			{
+				"name": "ArrowRight",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"CollapsiblePrimitive": [
+			{
+				"name": "CollapsiblePrimitive",
+				"module": "@radix-ui/react-collapsible",
+				"isDefault": true,
+				"asDefinition": "* as CollapsiblePrimitive"
+			}
+		],
+		"type DialogProps": [
+			{
+				"name": "type DialogProps",
+				"module": "@radix-ui/react-dialog",
+				"isDefault": false
+			}
+		],
+		"Command as CommandPrimitive": [
+			{
+				"name": "Command as CommandPrimitive",
+				"module": "cmdk",
+				"isDefault": false
+			}
+		],
+		"Dialog": [
+			{
+				"name": "Dialog",
+				"module": "@/components/ui/dialog",
+				"isDefault": false
+			}
+		],
+		"DialogContent": [
+			{
+				"name": "DialogContent",
+				"module": "@/components/ui/dialog",
+				"isDefault": false
+			}
+		],
+		"useRef": [
+			{
+				"name": "useRef",
+				"module": "react",
+				"isDefault": false
+			}
+		],
+		"Send": [
+			{
+				"name": "Send",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Trash2": [
+			{
+				"name": "Trash2",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Sparkles": [
+			{
+				"name": "Sparkles",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Lock": [
+			{
+				"name": "Lock",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"MapPin": [
+			{
+				"name": "MapPin",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"useToast": [
+			{
+				"name": "useToast",
+				"module": "@/hooks/use-toast",
+				"isDefault": false
+			}
+		],
+		"WelcomeScreen": [
+			{
+				"name": "WelcomeScreen",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\chat\\WelcomeScreen.tsx",
+				"isDefault": true
+			},
+			{
+				"name": "WelcomeScreen",
+				"module": "@/components/chat/WelcomeScreen",
+				"isDefault": true
+			}
+		],
+		"MessageBubble": [
+			{
+				"name": "MessageBubble",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\chat\\MessageBubble.tsx",
+				"isDefault": true
+			},
+			{
+				"name": "MessageBubble",
+				"module": "@/components/chat/MessageBubble",
+				"isDefault": true
+			}
+		],
+		"Fuel": [
+			{
+				"name": "Fuel",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Package": [
+			{
+				"name": "Package",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"FileText": [
+			{
+				"name": "FileText",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Flame": [
+			{
+				"name": "Flame",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"type { Message": [
+			{
+				"name": "type { Message",
+				"module": "@/stores/chatStore",
+				"isDefault": true
+			}
+		],
+		"Plus": [
+			{
+				"name": "Plus",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"LogOut": [
+			{
+				"name": "LogOut",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Separator": [
+			{
+				"name": "Separator",
+				"module": "@/components/ui/separator",
+				"isDefault": false
+			}
+		],
+		"formatDistanceToNow": [
+			{
+				"name": "formatDistanceToNow",
+				"module": "date-fns",
+				"isDefault": false
+			}
+		],
+		"supabase": [
+			{
+				"name": "supabase",
+				"module": "@/integrations/supabase/client",
+				"isDefault": false
+			},
+			{
+				"name": "supabase",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\client.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"createClient": [
+			{
+				"name": "createClient",
+				"module": "@supabase/supabase-js",
+				"isDefault": false
+			}
+		],
+		"Json": [
+			{
+				"name": "Json",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"Database": [
+			{
+				"name": "Database",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"Tables": [
+			{
+				"name": "Tables",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"TablesInsert": [
+			{
+				"name": "TablesInsert",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"TablesUpdate": [
+			{
+				"name": "TablesUpdate",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"Enums": [
+			{
+				"name": "Enums",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"CompositeTypes": [
+			{
+				"name": "CompositeTypes",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"Constants": [
+			{
+				"name": "Constants",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\integrations\\supabase\\types.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"OTPInput": [
+			{
+				"name": "OTPInput",
+				"module": "input-otp",
+				"isDefault": false
+			}
+		],
+		"OTPInputContext": [
+			{
+				"name": "OTPInputContext",
+				"module": "input-otp",
+				"isDefault": false
+			}
+		],
+		"Dot": [
+			{
+				"name": "Dot",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"HoverCardPrimitive": [
+			{
+				"name": "HoverCardPrimitive",
+				"module": "@radix-ui/react-hover-card",
+				"isDefault": true,
+				"asDefinition": "* as HoverCardPrimitive"
+			}
+		],
+		"LabelPrimitive": [
+			{
+				"name": "LabelPrimitive",
+				"module": "@radix-ui/react-label",
+				"isDefault": true,
+				"asDefinition": "* as LabelPrimitive"
+			}
+		],
+		"Controller": [
+			{
+				"name": "Controller",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"ControllerProps": [
+			{
+				"name": "ControllerProps",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"FieldPath": [
+			{
+				"name": "FieldPath",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"FieldValues": [
+			{
+				"name": "FieldValues",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"FormProvider": [
+			{
+				"name": "FormProvider",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"useFormContext": [
+			{
+				"name": "useFormContext",
+				"module": "react-hook-form",
+				"isDefault": false
+			}
+		],
+		"DropdownMenuPrimitive": [
+			{
+				"name": "DropdownMenuPrimitive",
+				"module": "@radix-ui/react-dropdown-menu",
+				"isDefault": true,
+				"asDefinition": "* as DropdownMenuPrimitive"
+			}
+		],
+		"Circle": [
+			{
+				"name": "Circle",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Drawer as DrawerPrimitive": [
+			{
+				"name": "Drawer as DrawerPrimitive",
+				"module": "vaul",
+				"isDefault": false
+			}
+		],
+		"DialogPrimitive": [
+			{
+				"name": "DialogPrimitive",
+				"module": "@radix-ui/react-dialog",
+				"isDefault": true,
+				"asDefinition": "* as DialogPrimitive"
+			}
+		],
+		"X": [
+			{
+				"name": "X",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ContextMenuPrimitive": [
+			{
+				"name": "ContextMenuPrimitive",
+				"module": "@radix-ui/react-context-menu",
+				"isDefault": true,
+				"asDefinition": "* as ContextMenuPrimitive"
+			}
+		],
+		"PopoverPrimitive": [
+			{
+				"name": "PopoverPrimitive",
+				"module": "@radix-ui/react-popover",
+				"isDefault": true,
+				"asDefinition": "* as PopoverPrimitive"
+			}
+		],
+		"NavigationMenuPrimitive": [
+			{
+				"name": "NavigationMenuPrimitive",
+				"module": "@radix-ui/react-navigation-menu",
+				"isDefault": true,
+				"asDefinition": "* as NavigationMenuPrimitive"
+			}
+		],
+		"MenubarPrimitive": [
+			{
+				"name": "MenubarPrimitive",
+				"module": "@radix-ui/react-menubar",
+				"isDefault": true,
+				"asDefinition": "* as MenubarPrimitive"
+			}
+		],
+		"GripVertical": [
+			{
+				"name": "GripVertical",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ResizablePrimitive": [
+			{
+				"name": "ResizablePrimitive",
+				"module": "react-resizable-panels",
+				"isDefault": true,
+				"asDefinition": "* as ResizablePrimitive"
+			}
+		],
+		"RadioGroupPrimitive": [
+			{
+				"name": "RadioGroupPrimitive",
+				"module": "@radix-ui/react-radio-group",
+				"isDefault": true,
+				"asDefinition": "* as RadioGroupPrimitive"
+			}
+		],
+		"ProgressPrimitive": [
+			{
+				"name": "ProgressPrimitive",
+				"module": "@radix-ui/react-progress",
+				"isDefault": true,
+				"asDefinition": "* as ProgressPrimitive"
+			}
+		],
+		"ScrollAreaPrimitive": [
+			{
+				"name": "ScrollAreaPrimitive",
+				"module": "@radix-ui/react-scroll-area",
+				"isDefault": true,
+				"asDefinition": "* as ScrollAreaPrimitive"
+			}
+		],
+		"SelectPrimitive": [
+			{
+				"name": "SelectPrimitive",
+				"module": "@radix-ui/react-select",
+				"isDefault": true,
+				"asDefinition": "* as SelectPrimitive"
+			}
+		],
+		"ChevronUp": [
+			{
+				"name": "ChevronUp",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"SeparatorPrimitive": [
+			{
+				"name": "SeparatorPrimitive",
+				"module": "@radix-ui/react-separator",
+				"isDefault": true,
+				"asDefinition": "* as SeparatorPrimitive"
+			}
+		],
+		"SheetPrimitive": [
+			{
+				"name": "SheetPrimitive",
+				"module": "@radix-ui/react-dialog",
+				"isDefault": true,
+				"asDefinition": "* as SheetPrimitive"
+			}
+		],
+		"TooltipPrimitive": [
+			{
+				"name": "TooltipPrimitive",
+				"module": "@radix-ui/react-tooltip",
+				"isDefault": true,
+				"asDefinition": "* as TooltipPrimitive"
+			}
+		],
+		"TogglePrimitive": [
+			{
+				"name": "TogglePrimitive",
+				"module": "@radix-ui/react-toggle",
+				"isDefault": true,
+				"asDefinition": "* as TogglePrimitive"
+			}
+		],
+		"ToggleGroupPrimitive": [
+			{
+				"name": "ToggleGroupPrimitive",
+				"module": "@radix-ui/react-toggle-group",
+				"isDefault": true,
+				"asDefinition": "* as ToggleGroupPrimitive"
+			}
+		],
+		"toggleVariants": [
+			{
+				"name": "toggleVariants",
+				"module": "@/components/ui/toggle",
+				"isDefault": false
+			}
+		],
+		"Toast": [
+			{
+				"name": "Toast",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastClose": [
+			{
+				"name": "ToastClose",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastDescription": [
+			{
+				"name": "ToastDescription",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastProvider": [
+			{
+				"name": "ToastProvider",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastTitle": [
+			{
+				"name": "ToastTitle",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastViewport": [
+			{
+				"name": "ToastViewport",
+				"module": "@/components/ui/toast",
+				"isDefault": false
+			}
+		],
+		"ToastPrimitives": [
+			{
+				"name": "ToastPrimitives",
+				"module": "@radix-ui/react-toast",
+				"isDefault": true,
+				"asDefinition": "* as ToastPrimitives"
+			}
+		],
+		"TextareaProps": [
+			{
+				"name": "TextareaProps",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\components\\ui\\textarea.tsx",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"TabsPrimitive": [
+			{
+				"name": "TabsPrimitive",
+				"module": "@radix-ui/react-tabs",
+				"isDefault": true,
+				"asDefinition": "* as TabsPrimitive"
+			}
+		],
+		"SwitchPrimitives": [
+			{
+				"name": "SwitchPrimitives",
+				"module": "@radix-ui/react-switch",
+				"isDefault": true,
+				"asDefinition": "* as SwitchPrimitives"
+			}
+		],
+		"useTheme": [
+			{
+				"name": "useTheme",
+				"module": "next-themes",
+				"isDefault": false
+			}
+		],
+		"SliderPrimitive": [
+			{
+				"name": "SliderPrimitive",
+				"module": "@radix-ui/react-slider",
+				"isDefault": true,
+				"asDefinition": "* as SliderPrimitive"
+			}
+		],
+		"VariantProps": [
+			{
+				"name": "VariantProps",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"PanelLeft": [
+			{
+				"name": "PanelLeft",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Sheet": [
+			{
+				"name": "Sheet",
+				"module": "@/components/ui/sheet",
+				"isDefault": false
+			}
+		],
+		"SheetContent": [
+			{
+				"name": "SheetContent",
+				"module": "@/components/ui/sheet",
+				"isDefault": false
+			}
+		],
+		"Skeleton": [
+			{
+				"name": "Skeleton",
+				"module": "@/components/ui/skeleton",
+				"isDefault": false
+			}
+		],
+		"Tooltip": [
+			{
+				"name": "Tooltip",
+				"module": "@/components/ui/tooltip",
+				"isDefault": false
+			}
+		],
+		"TooltipContent": [
+			{
+				"name": "TooltipContent",
+				"module": "@/components/ui/tooltip",
+				"isDefault": false
+			}
+		],
+		"TooltipTrigger": [
+			{
+				"name": "TooltipTrigger",
+				"module": "@/components/ui/tooltip",
+				"isDefault": false
+			}
+		],
+		"OrchestratorResponse": [
+			{
+				"name": "OrchestratorResponse",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\services\\api.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GUEST_CHATBOT_NAME": [
+			{
+				"name": "GUEST_CHATBOT_NAME",
+				"module": "@/stores/chatStore",
+				"isDefault": false
+			},
+			{
+				"name": "GUEST_CHATBOT_NAME",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\stores\\chatStore.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"Message": [
+			{
+				"name": "Message",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\stores\\chatStore.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Conversation": [
+			{
+				"name": "Conversation",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\stores\\chatStore.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Chatbot": [
+			{
+				"name": "Chatbot",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\stores\\chatStore.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"App": [
+			{
+				"name": "App",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\src\\App.tsx",
+				"isDefault": true
+			}
+		],
+		"config": [
+			{
+				"name": "config",
+				"path": "c:\\Users\\dell\\Downloads\\afri-chat-buddy-main\\afri-chat-buddy-main\\capacitor.config.ts",
+				"isDefault": true
+			}
+		],
+		"type { CapacitorConfig": [
+			{
+				"name": "type { CapacitorConfig",
+				"module": "@capacitor/cli",
+				"isDefault": true
+			}
+		]
+	}
+}
